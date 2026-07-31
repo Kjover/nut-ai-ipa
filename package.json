@@ -1,0 +1,29 @@
+{
+  "name": "nut-ai",
+  "version": "0.0.0",
+  "private": true,
+  "license": "AGPL-3.0-or-later",
+  "description": "Nut AI — an open-source AI photo calorie tracker that never shows a number it cannot justify.",
+  "workspaces": [
+    "apps/*",
+    "packages/*",
+    "eval"
+  ],
+  "engines": {
+    "node": ">=20.19.0"
+  },
+  "scripts": {
+    "lint": "eslint . --max-warnings=0",
+    "typecheck": "tsc --build --force",
+    "test": "vitest run",
+    "test:watch": "vitest",
+    "check:node-purity": "node scripts/check-node-purity.mjs",
+    "check": "npm run lint && npm run typecheck && npm run test && npm run check:node-purity"
+  },
+  "devDependencies": {
+    "typescript": "^5.7.0",
+    "vitest": "^3.0.0",
+    "eslint": "^9.17.0",
+    "typescript-eslint": "^8.19.0"
+  }
+}

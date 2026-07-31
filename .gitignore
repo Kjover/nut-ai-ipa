@@ -1,0 +1,43 @@
+node_modules/
+dist/
+build/
+coverage/
+*.tsbuildinfo
+
+# Expo
+.expo/
+.expo-shared/
+apps/mobile/ios/
+apps/mobile/android/
+*.ipa
+*.apk
+*.aab
+
+# Built data artifact — produced by nutai-nutrition-data, never committed here.
+# It is ODbL-licensed and lives on its own release cadence (PLAN.md D6/D8).
+apps/mobile/assets/nutrition.db
+apps/mobile/assets/nutrition.db-*
+
+# Path B model weights — large binaries, fetched at build time
+apps/mobile/src/inference/pathB/models/*.pte
+apps/mobile/src/inference/pathB/models/*.tflite
+
+# NEVER commit. Keys live only in expo-secure-store, written from runtime user
+# input. PLAN.md §4.4: never from EXPO_PUBLIC_*, app.json, .env, or EAS secrets.
+.env
+.env.*
+!.env.example
+*.p8
+*.p12
+*.mobileprovision
+*.keystore
+
+# Golden set / eval working data — lives in its own repo (CC BY 4.0), and the
+# non-commercial supplements (NutritionVerse, FPB, MetaFood3D) must NEVER be
+# redistributed from here. See PLAN-ADDENDUM-2026-07-31.md §3.3.
+eval/data/
+eval/reports/
+eval/.promptfoo/
+
+.DS_Store
+*.log
