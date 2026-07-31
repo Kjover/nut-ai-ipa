@@ -1,0 +1,55 @@
+{
+  "extends": "./tsconfig.base.json",
+  "compilerOptions": {
+    "noEmit": true,
+    "composite": false,
+    "declaration": false,
+    "declarationMap": false,
+    "types": [
+      "node"
+    ],
+    "baseUrl": ".",
+    "paths": {
+      "@nutai/core-schema": [
+        "packages/core-schema/src/index.ts"
+      ],
+      "@nutai/gram-engine": [
+        "packages/gram-engine/src/index.ts"
+      ],
+      "@nutai/resolver": [
+        "packages/resolver/src/index.ts"
+      ],
+      "@nutai/totals": [
+        "packages/totals/src/index.ts"
+      ],
+      "@nutai/confidence": [
+        "packages/confidence/src/index.ts"
+      ],
+      "@nutai/repair": [
+        "packages/repair/src/index.ts"
+      ],
+      "@nutai/goals": [
+        "packages/goals/src/index.ts"
+      ],
+      "@nutai/prompt": [
+        "packages/prompt/src/index.ts"
+      ],
+      "@nutai/db-adapter": [
+        "packages/db-adapter/src/index.ts"
+      ],
+      "@nutai/clamp": [
+        "packages/clamp/src/index.ts"
+      ]
+    },
+    "lib": [
+      "ES2022",
+      "DOM"
+    ]
+  },
+  "include": [
+    "packages/**/src/**/*",
+    "eval/**/*",
+    "scripts/**/*",
+    "vitest.config.ts"
+  ]
+}
