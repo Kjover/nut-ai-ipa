@@ -85,8 +85,6 @@ export default function Home() {
   const over = remaining < 0
   const pct = goal.targetKcal > 0 ? totals.kcal / goal.targetKcal : 0
   const empty = totals.mealCount === 0 && totals.pendingCount === 0
-  const pageWidth = width - space.lg * 2
-
   return (
     <ScrollView
       style={{ backgroundColor: theme.bg }}
@@ -105,20 +103,23 @@ export default function Home() {
       {/* Day strip */}
       <DayStrip selected={offset} onSelect={setOffset} />
 
-      {/* Paged carousel */}
+      {/* Paged carousel. pagingEnabled snaps by the VIEWPORT width, so each
+          page must be exactly `width` wide with its own internal padding —
+          sizing pages narrower and padding the container makes every swipe
+          drift further off-grid, clipping the left card and bleeding the
+          neighbor in. That was the "30g Fiber left" cut-off. */}
       <ScrollView
         horizontal
         pagingEnabled
         showsHorizontalScrollIndicator={false}
         scrollEventThrottle={16}
         onScroll={(e: NativeSyntheticEvent<NativeScrollEvent>) =>
-          setPage(Math.round(e.nativeEvent.contentOffset.x / pageWidth))
+          setPage(Math.round(e.nativeEvent.contentOffset.x / width))
         }
-        contentContainerStyle={{ paddingHorizontal: space.lg }}
         style={{ marginTop: space.md }}
       >
         {/* Page 1 — calories and the three macros */}
-        <View style={{ width: pageWidth }}>
+        <View style={{ width, paddingHorizontal: space.lg }}>
           <View style={[styles.heroCard, { backgroundColor: theme.bgElevated, borderColor: theme.border }]}>
             <View style={{ flex: 1 }}>
               <Text style={[styles.hero, { color: theme.text }]}>
@@ -141,7 +142,7 @@ export default function Home() {
         </View>
 
         {/* Page 2 — micros and the health score */}
-        <View style={{ width: pageWidth }}>
+        <View style={{ width, paddingHorizontal: space.lg }}>
           <View style={styles.macroRow}>
             <MacroCard label="Fiber" icon="fiber" eaten={0} target={30} color="#8B7BD8" unit="g" />
             <MacroCard label="Sugar" icon="sugar" eaten={0} target={50} color="#E88BA8" unit="g" />
@@ -163,7 +164,7 @@ export default function Home() {
         </View>
 
         {/* Page 3 — activity and water */}
-        <View style={{ width: pageWidth }}>
+        <View style={{ width, paddingHorizontal: space.lg }}>
           <View style={{ flexDirection: 'row', gap: space.md }}>
             <View style={[styles.card, { flex: 1, backgroundColor: theme.bgElevated, borderColor: theme.border }]}>
               <Text style={[type.caption, { color: theme.textMuted }]}>Steps</Text>
@@ -391,7 +392,8 @@ function MacroCard({
 
   return (
     <View style={[styles.macroCard, { backgroundColor: theme.bgElevated, borderColor: theme.border }]}>
-      <Text style={[styles.macroNum, { color: theme.text }]}>
+      {/* "2300mg" must shrink, never wrap — a two-line number reads broken. */}
+      <Text style={[styles.macroNum, { color: theme.text }]} numberOfLines={1} adjustsFontSizeToFit>
         {Math.round(left)}
         {unit}
       </Text>

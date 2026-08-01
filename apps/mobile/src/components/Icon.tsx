@@ -32,6 +32,7 @@ export type IconName =
   | 'barcode'
   | 'nutritionLabel'
   | 'receipt'
+  | 'run'
   | 'search'
   | 'bookmark'
   | 'dumbbell'
@@ -222,6 +223,15 @@ function render(name: IconName, c: string, s: Common) {
           <Rect {...s} x="5" y="3.5" width="14" height="17" rx="1.5" />
           <Path {...s} d="M8 7h8" strokeWidth={2.6} />
           <Path {...s} d="M8 11h8M8 14h8M8 17h5" />
+        </G>
+      )
+    case 'run':
+      // A running shoe in profile: sole line, upper curve, lace ticks.
+      return (
+        <G>
+          <Path {...s} d="M3.5 16.5h17v1.5a1.5 1.5 0 0 1-1.5 1.5H5a1.5 1.5 0 0 1-1.5-1.5v-1.5Z" />
+          <Path {...s} d="M3.5 16.5c0-2.2 1.6-3.4 3.8-3.9l2.4-.6c.9-.2 1.6-.8 2-1.6l1-2.2 2.6 2.7c.7.7 1.6 1.2 2.6 1.4 1.5.3 2.6 1.1 2.6 2.7v1.5" />
+          <Path {...s} d="m11 12.6 1.4 1.4M13.2 11l1.4 1.4" />
         </G>
       )
     case 'receipt':

@@ -164,12 +164,21 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
   },
   controls: { position: 'absolute', left: 0, right: 0, bottom: 0, alignItems: 'center', gap: space.lg },
-  modeRow: { flexDirection: 'row', gap: space.sm },
+  // 2x2 — four pills in one row overflow both screen edges on every iPhone.
+  modeRow: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: space.sm,
+    paddingHorizontal: space.lg,
+    justifyContent: 'center',
+    alignSelf: 'stretch',
+  },
   modePill: {
     flexDirection: 'row',
     alignItems: 'center',
+    justifyContent: 'center',
     gap: space.xs,
-    paddingHorizontal: space.md,
+    width: '47%',
     paddingVertical: space.sm,
     borderRadius: radius.md,
     backgroundColor: 'rgba(0,0,0,0.45)',

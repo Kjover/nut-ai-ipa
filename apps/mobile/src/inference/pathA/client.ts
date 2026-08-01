@@ -1,11 +1,14 @@
 import {
   buildAnthropicRequest,
   buildGeminiRequest,
+  buildExerciseEstimateInstruction,
   buildLabelScanRequest,
   buildOpenAIRequest,
   buildReceiptScanRequest,
+  buildTextJsonRequest,
   buildWebLookupRequest,
   computeScanCost,
+  EXERCISE_ESTIMATE_PROMPT_VERSION,
   type ProviderId,
 } from '@nutai/prompt'
 
@@ -242,6 +245,26 @@ export async function runLabelScan(
   timeoutMs = 30_000,
 ): Promise<WebLookupOutcome> {
   return postVisionJson(provider, buildLabelScanRequest(provider, input, credential), fetchImpl, timeoutMs)
+}
+
+/**
+ * Free-text exercise estimate — the one exercise path a model owns, labeled
+ * as such in the UI. Text in, {label, duration_min, calories_kcal} out.
+ */
+export async function runExerciseEstimate(
+  provider: ProviderId,
+  input: { model: string; description: string; weightKg: number | null },
+  credential: Credential,
+  fetchImpl: typeof fetch = fetch,
+  timeoutMs = 20_000,
+): Promise<WebLookupOutcome> {
+  const built = buildTextJsonRequest(
+    provider,
+    { model: input.model, instruction: buildExerciseEstimateInstruction(input.description, input.weightKg) },
+    credential,
+    EXERCISE_ESTIMATE_PROMPT_VERSION,
+  )
+  return postVisionJson(provider, built, fetchImpl, timeoutMs)
 }
 
 /** Receipt transcription: same transport, different instruction and validator. */
