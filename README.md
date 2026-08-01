@@ -6,7 +6,33 @@ Point your camera at a meal and get calories and macros — with an honest uncer
 assumptions it made shown as editable chips, and a correction flow that recomputes everything locally
 and instantly. No subscription, no paywall, no account, no server.
 
-> **Status: pre-alpha.** M0 (build rails). Nothing works yet.
+<img src="docs/img/hero.png" alt="Nut AI home screen" width="320" />
+
+> **Status: alpha.** The full loop works on iPhone and Android — scan, review, correct, log, track.
+> On-device inference and the published accuracy numbers are still ahead. Expect sharp edges.
+
+## What works today
+
+- **Photo scans** with your own AI key: the model identifies components (a burger comes back as
+  patty, bun, and toppings — never one blob), the deterministic engine does every number, and each
+  row shows its uncertainty band and where its data came from.
+- **Four camera modes** — food photo, **barcode** (bundled-database hits cost nothing and never
+  touch a model), **nutrition label** (transcribes the printed panel, refuses to guess a missing
+  serving weight), and **receipt** (reads the line items, then fetches each item's published
+  nutrition with the merchant as the brand).
+- **Web lookup for branded and restaurant food**: when the local database misses — or a logo in
+  frame names a brand — one search against the provider's own tool transcribes the published
+  nutrition facts, source URL attached. Menu ambiguity comes back as options that each carry their
+  own macros, so answering "which sandwich?" is instant and free.
+- **Fix Result**: describe what's wrong in a sentence; only what you mention changes.
+- **A health score with a published formula** — fixed arithmetic over what you logged, reasons shown
+  on tap, never an "AI" number.
+- **Exercise logging** where Run and Weight lifting use MET × your body weight × minutes (no model),
+  Describe is the one AI-estimated path and says so, and Manual is your number verbatim.
+- **Adaptive targets** that re-derive from your weigh-in trend, with hand-set targets always
+  respected.
+- **Export / import**: one JSON file with everything; restore it from the first onboarding screen on
+  a new phone. Your API key never travels in it.
 
 ---
 
@@ -127,9 +153,9 @@ npm install
 npm run check        # lint + typecheck + tests + node-purity
 ```
 
-**Expo Go is not a supported development mode past initial scaffolding.** On-device inference,
-biometric-gated key storage, bottom sheets, MMKV, widgets, HealthKit and Health Connect all require a
-compiled dev client. Do not architect around a constraint that dies in week two.
+**Expo Go is not a supported development mode.** The camera, SQLite, Keychain key storage, HealthKit,
+and file export/import all require a compiled app — build with Xcode or `expo run:android` as shown
+above.
 
 ## Licensing
 
