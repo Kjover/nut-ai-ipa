@@ -2,8 +2,10 @@ import { router } from 'expo-router'
 import { TrendComparisonChart } from '../../src/components/onboarding/Charts'
 import { OnboardingScreen } from '../../src/components/onboarding/Chrome'
 import { nextRoute, stepIndex, TOTAL_STEPS } from '../../src/onboarding/flow'
+import { useAnswers } from '../../src/onboarding/store'
 
 export default function TrendScreen() {
+  const a = useAnswers()
   return (
     <OnboardingScreen
       step={stepIndex('trend')}
@@ -12,7 +14,7 @@ export default function TrendScreen() {
       onCta={() => router.push(nextRoute('trend') as never)}
       scroll
     >
-      <TrendComparisonChart />
+      <TrendComparisonChart gaining={a.goal === 'gain'} />
     </OnboardingScreen>
   )
 }

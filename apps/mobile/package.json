@@ -13,6 +13,7 @@
     "typecheck": "tsc --noEmit -p tsconfig.json"
   },
   "dependencies": {
+    "@kingstinct/react-native-healthkit": "^14.0.2",
     "@nutai/clamp": "*",
     "@nutai/confidence": "*",
     "@nutai/core-schema": "*",

@@ -35,15 +35,26 @@ const H = 170
  * followed by regain. We keep the comparison and label the y-axis honestly as a
  * trend rather than implying guaranteed numbers.
  */
-export function TrendComparisonChart() {
+export function TrendComparisonChart({ gaining }: { gaining: boolean }) {
   const theme = useTheme()
 
-  const withPlan = smoothPath([
-    { x: 10, y: 30 }, { x: 90, y: 42 }, { x: 170, y: 105 }, { x: 250, y: 135 }, { x: 290, y: 138 },
-  ])
-  const without = smoothPath([
-    { x: 10, y: 30 }, { x: 80, y: 92 }, { x: 140, y: 100 }, { x: 220, y: 45 }, { x: 290, y: 22 },
-  ])
+  // SVG y grows downward, so a GAINING plan line must travel to a smaller y.
+  // The "without a plan" line always ends back near the start: the documented
+  // pattern is regression to baseline, in either direction.
+  const withPlan = gaining
+    ? smoothPath([
+        { x: 10, y: 138 }, { x: 90, y: 126 }, { x: 170, y: 63 }, { x: 250, y: 33 }, { x: 290, y: 30 },
+      ])
+    : smoothPath([
+        { x: 10, y: 30 }, { x: 90, y: 42 }, { x: 170, y: 105 }, { x: 250, y: 135 }, { x: 290, y: 138 },
+      ])
+  const without = gaining
+    ? smoothPath([
+        { x: 10, y: 138 }, { x: 80, y: 76 }, { x: 140, y: 68 }, { x: 220, y: 120 }, { x: 290, y: 144 },
+      ])
+    : smoothPath([
+        { x: 10, y: 30 }, { x: 80, y: 92 }, { x: 140, y: 100 }, { x: 220, y: 45 }, { x: 290, y: 22 },
+      ])
 
   return (
     <View style={[styles.card, { backgroundColor: theme.bgSunken }]}>
@@ -64,8 +75,8 @@ export function TrendComparisonChart() {
         <Path d={without} stroke="#E8615A" strokeWidth="3" fill="none" strokeLinecap="round" />
         <Path d={withPlan} stroke={theme.text} strokeWidth="3.5" fill="none" strokeLinecap="round" />
 
-        <Circle cx="10" cy="30" r="6" fill={theme.bg} stroke={theme.text} strokeWidth="3" />
-        <Circle cx="290" cy="138" r="6" fill={theme.bg} stroke={theme.text} strokeWidth="3" />
+        <Circle cx="10" cy={gaining ? 138 : 30} r="6" fill={theme.bg} stroke={theme.text} strokeWidth="3" />
+        <Circle cx="290" cy={gaining ? 30 : 138} r="6" fill={theme.bg} stroke={theme.text} strokeWidth="3" />
       </Svg>
 
       <View style={styles.legendRow}>

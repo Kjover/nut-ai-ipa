@@ -1,5 +1,7 @@
 import { router } from 'expo-router'
-import { StyleSheet, Text, View } from 'react-native'
+import { useEffect, useState } from 'react'
+import { ActivityIndicator, StyleSheet, Text, View } from 'react-native'
+import { availability, requestPermissions, type HealthAvailability } from '../../src/health/healthkit'
 import { OnboardingScreen } from '../../src/components/onboarding/Chrome'
 import { nextRoute, stepIndex, TOTAL_STEPS } from '../../src/onboarding/flow'
 import { setAnswer } from '../../src/onboarding/store'
@@ -9,29 +11,78 @@ import { radius, space, type } from '../../src/theme/tokens'
 /**
  * Apple Health.
  *
- * The HealthKit integration itself is M6. Rather than fake a permission prompt,
- * this screen is honest about what it does today: Continue records the intent so
- * the toggle is pre-armed in Settings, and nothing is claimed to have synced.
- * A screen that says "connected" while writing nothing would be the exact kind
- * of dishonesty this app exists to avoid.
+ * Continue presents the real HealthKit sheet.
+ *
+ * WHAT THIS SCREEN WILL NOT CLAIM: that permission was granted. iOS never reports
+ * whether a READ permission was allowed — `requestAuthorization` resolves
+ * identically whether you tapped Allow or Don't Allow, because Apple treats "this
+ * app knows you declined" as itself a privacy leak. So the copy afterwards says
+ * the sheet was shown, not that syncing works. Write access IS reported, and that
+ * is the one thing stated as fact.
+ *
+ * On the Simulator HealthKit exists but has no data, so an empty read there means
+ * nothing — which is exactly why this screen never reports success from silence.
  */
 export default function HealthScreen() {
   const theme = useTheme()
+  const [avail, setAvail] = useState<HealthAvailability | null>(null)
+  const [busy, setBusy] = useState(false)
+  const [outcome, setOutcome] = useState<string | null>(null)
 
-  const go = (connected: boolean) => {
-    setAnswer('healthConnected', connected)
-    router.push(nextRoute('health') as never)
+  useEffect(() => {
+    let alive = true
+    void availability().then((a) => {
+      if (alive) setAvail(a)
+    })
+    return () => {
+      alive = false
+    }
+  }, [])
+
+  const go = () => router.push(nextRoute('health') as never)
+
+  async function connect() {
+    if (busy) return
+
+    if (avail !== 'available') {
+      setAnswer('healthConnected', false)
+      go()
+      return
+    }
+
+    setBusy(true)
+    const res = await requestPermissions()
+    setBusy(false)
+
+    setAnswer('healthConnected', res.prompted)
+
+    if (res.error) {
+      setOutcome(res.error)
+      return
+    }
+    // Deliberately not "Connected!". See the note above about read status.
+    setOutcome(
+      res.canWrite
+        ? 'Health is set up. Meals you log will be written to the Health app.'
+        : 'Health sheet completed. Whatever you allowed there is what we can use — iOS does not tell apps which reads were granted.',
+    )
   }
+
+  const unsupported = avail === 'not-ios' || avail === 'unavailable'
 
   return (
     <OnboardingScreen
       step={stepIndex('health')}
       total={TOTAL_STEPS}
       title=""
-      cta="Continue"
-      onCta={() => go(true)}
-      secondaryLabel="Skip"
-      onSecondary={() => go(false)}
+      cta={outcome || unsupported ? 'Continue' : 'Connect to Health'}
+      onCta={outcome || unsupported ? go : connect}
+      ctaDisabled={busy}
+      {...(outcome ? {} : { secondaryLabel: 'Skip' })}
+      onSecondary={() => {
+        setAnswer('healthConnected', false)
+        go()
+      }}
       scroll
     >
       <View style={{ alignItems: 'center' }}>
@@ -46,7 +97,7 @@ export default function HealthScreen() {
             </View>
           </View>
           <View style={styles.wordRow}>
-            {['Walking', 'Running', 'Yoga', 'Sleep'].map((w) => (
+            {['Steps', 'Workouts', 'Weight', 'Energy'].map((w) => (
               <View key={w} style={[styles.word, { backgroundColor: theme.bgElevated }]}>
                 <Text style={[type.label, { color: theme.text }]}>{w}</Text>
               </View>
@@ -60,9 +111,32 @@ export default function HealthScreen() {
         Sync your daily activity between Nut AI and the Health app so your calorie target reflects
         what you actually did.
       </Text>
-      <Text style={[type.caption, { color: theme.textMuted, marginTop: space.lg }]}>
-        Not wired up yet — this arms the toggle in Settings and asks for permission when the
-        integration ships. We won't tell you it synced when it didn't.
+
+      {busy ? (
+        <View style={{ marginTop: space.xl, alignItems: 'center' }}>
+          <ActivityIndicator color={theme.textFaint} />
+        </View>
+      ) : null}
+
+      {outcome ? (
+        <View style={[styles.note, { backgroundColor: theme.uncertainBg }]}>
+          <Text style={[type.caption, { color: theme.text }]}>{outcome}</Text>
+        </View>
+      ) : null}
+
+      {unsupported && avail != null ? (
+        <View style={[styles.note, { backgroundColor: theme.uncertainBg }]}>
+          <Text style={[type.caption, { color: theme.text }]}>
+            {avail === 'not-ios'
+              ? 'Apple Health is iOS only. On Android this will use Health Connect instead.'
+              : 'Health data is not available on this device, so there is nothing to connect to.'}
+          </Text>
+        </View>
+      ) : null}
+
+      <Text style={[type.caption, { color: theme.textFaint, marginTop: space.lg, lineHeight: 19 }]}>
+        We ask to read steps, workouts, weight and active energy, and to write back the meals you
+        log. Nothing else. You can change any of it later in the Health app under Sources.
       </Text>
     </OnboardingScreen>
   )
@@ -81,4 +155,5 @@ const styles = StyleSheet.create({
   wordRow: { flexDirection: 'row', flexWrap: 'wrap', justifyContent: 'center', gap: space.sm, marginTop: space.lg },
   word: { paddingHorizontal: space.md, paddingVertical: 6, borderRadius: radius.pill },
   heading: { fontSize: 34, lineHeight: 40, fontWeight: '800', letterSpacing: -1, marginTop: space.xl },
+  note: { marginTop: space.lg, padding: space.lg, borderRadius: radius.lg },
 })

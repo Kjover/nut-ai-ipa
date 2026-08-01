@@ -55,6 +55,21 @@ const config: ExpoConfig = {
     ['expo-camera', { cameraPermission: 'Nut AI uses your camera to photograph meals and scan barcodes.' }],
     'expo-secure-store',
     'expo-sqlite',
+    [
+      '@kingstinct/react-native-healthkit',
+      {
+        // Both strings are required by App Review, and they must describe what we
+        // actually do rather than what HealthKit could theoretically allow.
+        NSHealthShareUsageDescription:
+          'Nut AI reads your steps, workouts and weight so your calorie target reflects what you actually did, instead of a fixed guess.',
+        NSHealthUpdateUsageDescription:
+          'Nut AI writes the meals you log to Health so your nutrition data lives alongside the rest of your health record.',
+        // Background delivery is deliberately off. It is an extra entitlement, it
+        // is a battery cost, and nothing here needs to react to a step count
+        // while the app is closed.
+        background: false,
+      },
+    ],
   ],
 
   experiments: { typedRoutes: true },

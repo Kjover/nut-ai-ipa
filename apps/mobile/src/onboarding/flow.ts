@@ -11,9 +11,12 @@ export const FLOW = [
   'birth',
   'height',
   'weight',
-  'trend',
   'professional',
   'goal',
+  // 'trend' sits AFTER 'goal' on purpose. In the reference it comes earlier and
+  // always draws a downward line, which is simply wrong for a user who picked
+  // "gain weight". A chart cannot adapt to a goal that has not been chosen yet.
+  'trend',
   'desired-weight',
   'potential',
   'blocker',
