@@ -42,6 +42,9 @@
       ],
       "@nutai/db-adapter/node": [
         "packages/db-adapter/src/node.ts"
+      ],
+      "@nutai/pipeline": [
+        "packages/pipeline/src/index.ts"
       ]
     },
     "lib": [

@@ -80,6 +80,17 @@ WHERE f.id = ?
  * produces the most confusing bug class available here: the barcode is in the
  * database, the scan succeeds, and the lookup misses.
  */
+/**
+ * SQLite returns `foods.id` as an INTEGER, but every consumer treats a food id as
+ * an opaque string key (it is also used for `user_foods:` and `fdc:` prefixed
+ * concept keys). Coercing at this boundary keeps the declared type honest —
+ * without it, TypeScript believes `foodId: string` while the runtime hands back a
+ * number, and every `===` comparison downstream silently fails.
+ */
+function coerceIds<T extends { foodId: unknown }>(row: T | null): (Omit<T, 'foodId'> & { foodId: string }) | null {
+  return row == null ? null : { ...row, foodId: String(row.foodId) }
+}
+
 export async function resolveByBarcode(
   db: DbAdapter,
   rawBarcode: string,
@@ -89,14 +100,15 @@ export async function resolveByBarcode(
 
   // Match the stored value whether it was indexed zero-padded or not.
   const unpadded = gtin.replace(/^0+/, '')
-  return db.get<ResolvedFood>(
+  const row = await db.get<ResolvedFood>(
     `${FOOD_BY_ID_SQL.replace('WHERE f.id = ?', 'WHERE f.barcode = ? OR f.barcode = ?')}`,
     [gtin, unpadded],
   )
+  return coerceIds(row)
 }
 
 export async function loadFood(db: DbAdapter, foodId: string): Promise<ResolvedFood | null> {
-  return db.get<ResolvedFood>(FOOD_BY_ID_SQL, [foodId])
+  return coerceIds(await db.get<ResolvedFood>(FOOD_BY_ID_SQL, [foodId]))
 }
 
 export interface ResolveResult {
@@ -132,7 +144,12 @@ export async function resolveByText(
 
     if (rows.length === 0) continue
 
-    const scored = scoreCandidates(rows, ctx)
+    // Same integer-vs-string coercion as loadFood — candidate ids flow straight
+    // into loadFood and into IngredientRow.sourceFoodId.
+    const scored = scoreCandidates(
+      rows.map((r) => ({ ...r, foodId: String(r.foodId) })),
+      ctx,
+    )
     return { outcome: decideOutcome(scored), ladderStep: step, zeroHit: false }
   }
 

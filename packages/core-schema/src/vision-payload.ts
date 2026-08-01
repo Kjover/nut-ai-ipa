@@ -183,10 +183,21 @@ export const ItemZ = z.object({
   /**
    * The model's own best-guess mass. LOWEST-TRUST signal in the pipeline —
    * rank 5 of 6 in the reconciliation ladder. Used only when no deterministic
-   * gram path exists. The clamp nulls this when it is out of bounds, which is a
-   * demotion to the remaining tiers, not a failure.
+   * gram path exists.
+   *
+   * DELIBERATELY UNBOUNDED HERE, unlike the confidence fields below.
+   *
+   * A range check on this field belongs to @nutai/clamp, not to validation. If
+   * Zod rejected an out-of-range mass, one absurd number on one item of a
+   * five-item meal would fail the WHOLE payload and the user would get nothing
+   * back from a scan they paid for. The clamp instead nulls the offending value
+   * and lets the reconciliation ladder fall through to its other tiers — a
+   * demotion, not a failure. Graceful degradation is the entire reason the clamp
+   * exists, and it cannot do its job if validation rejects the input first.
+   *
+   * Structural violations still fail the payload. Value-range violations do not.
    */
-  model_gram_estimate: z.number().min(0).max(5000).nullable(),
+  model_gram_estimate: z.number().finite().nullable(),
   identification_confidence: z.number().min(0).max(1),
   /**
    * Probability the mass estimate is within ~20% of truth. Reported SEPARATELY

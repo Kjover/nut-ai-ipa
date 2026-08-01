@@ -1,0 +1,21 @@
+{
+  "name": "@nutai/pipeline",
+  "version": "0.0.0",
+  "private": true,
+  "license": "AGPL-3.0-or-later",
+  "type": "module",
+  "main": "./dist/index.js",
+  "types": "./dist/index.d.ts",
+  "exports": { ".": { "types": "./dist/index.d.ts", "import": "./dist/index.js" } },
+  "scripts": { "build": "tsc --build" },
+  "dependencies": {
+    "@nutai/core-schema": "*",
+    "@nutai/clamp": "*",
+    "@nutai/gram-engine": "*",
+    "@nutai/resolver": "*",
+    "@nutai/totals": "*",
+    "@nutai/confidence": "*",
+    "@nutai/repair": "*",
+    "@nutai/db-adapter": "*"
+  }
+}

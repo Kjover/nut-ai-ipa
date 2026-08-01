@@ -23,6 +23,7 @@ export default defineConfig({
       '@nutai/db-adapter/node': fileURLToPath(new URL('./packages/db-adapter/src/node.ts', import.meta.url)),
       '@nutai/db-adapter': pkg('db-adapter'),
       '@nutai/clamp': pkg('clamp'),
+      '@nutai/pipeline': pkg('pipeline'),
     },
   },
   test: {
