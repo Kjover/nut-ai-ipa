@@ -137,5 +137,7 @@ export interface MacroTotals {
   fat_g: number
   carbs_g: number
   fiber_g: number
+  /** Like fiber: a null on a row contributes 0 to the sum, never a fake zero claim. */
+  sugar_g: number
   sodium_mg: number
 }

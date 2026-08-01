@@ -84,6 +84,11 @@ export function setPhase(next: ScanPhase) {
   emit()
 }
 
+/** Non-hook read for the orchestrator (Fix Result needs the current rows). */
+export function getPhase(): ScanPhase {
+  return phase
+}
+
 /** Every edit path funnels through here, so the invariant holds in exactly one place. */
 function mutateMeal(fn: (meal: LoggedMeal) => LoggedMeal) {
   if (phase.kind !== 'ready') return

@@ -3,10 +3,20 @@ import { router } from 'expo-router'
 import { useRef, useState } from 'react'
 import { Pressable, StyleSheet, Text, View } from 'react-native'
 import { useSafeAreaInsets } from 'react-native-safe-area-context'
-import { startScan } from '../src/scan/orchestrator'
+import { Icon, type IconName } from '../src/components/Icon'
+import { startBarcodeScan, startLabelScan, startReceiptScan, startScan } from '../src/scan/orchestrator'
 import { setPhase } from '../src/scan/store'
 import { useTheme } from '../src/theme/ThemeProvider'
 import { MIN_TAP_TARGET, radius, space, type } from '../src/theme/tokens'
+
+type CameraMode = 'food' | 'barcode' | 'label' | 'receipt'
+
+const MODES: Array<{ id: CameraMode; label: string; icon: IconName }> = [
+  { id: 'food', label: 'Scan food', icon: 'scan' },
+  { id: 'barcode', label: 'Barcode', icon: 'barcode' },
+  { id: 'label', label: 'Label', icon: 'nutritionLabel' },
+  { id: 'receipt', label: 'Receipt', icon: 'receipt' },
+]
 
 /**
  * Capture.
@@ -29,6 +39,9 @@ export default function Camera() {
   const [permission, requestPermission] = useCameraPermissions()
   const cameraRef = useRef<CameraView>(null)
   const [busy, setBusy] = useState(false)
+  const [mode, setMode] = useState<CameraMode>('food')
+  // Barcode frames arrive continuously; only the FIRST detection may fire.
+  const barcodeFired = useRef(false)
 
   if (!permission) return <View style={{ flex: 1, backgroundColor: '#000' }} />
 
@@ -68,24 +81,64 @@ export default function Camera() {
       // behind the result screen's progress states — the user never stares at
       // a frozen viewfinder wondering whether the shutter worked.
       router.replace('/result')
-      void startScan(shot.uri)
+      if (mode === 'label') void startLabelScan(shot.uri)
+      else if (mode === 'receipt') void startReceiptScan(shot.uri)
+      else void startScan(shot.uri)
     } finally {
       setBusy(false)
     }
   }
 
+  function onBarcode(data: string) {
+    if (barcodeFired.current || !data) return
+    barcodeFired.current = true
+    router.replace('/result')
+    void startBarcodeScan(data)
+  }
+
   return (
     <View style={{ flex: 1, backgroundColor: '#000' }}>
-      <CameraView ref={cameraRef} style={StyleSheet.absoluteFill} facing="back" />
+      <CameraView
+        ref={cameraRef}
+        style={StyleSheet.absoluteFill}
+        facing="back"
+        barcodeScannerSettings={{ barcodeTypes: ['ean13', 'ean8', 'upc_a', 'upc_e'] }}
+        onBarcodeScanned={mode === 'barcode' ? ({ data }) => onBarcode(data) : undefined}
+      />
 
-      <View style={[styles.shutterRow, { paddingBottom: Math.max(insets.bottom, space.xl) }]}>
-        <Pressable
-          accessibilityRole="button"
-          accessibilityLabel="Take photo"
-          onPress={capture}
-          disabled={busy}
-          style={[styles.shutter, busy && { opacity: 0.5 }]}
-        />
+      <View style={[styles.controls, { paddingBottom: Math.max(insets.bottom, space.xl) }]}>
+        <View style={styles.modeRow}>
+          {MODES.map((m) => {
+            const active = mode === m.id
+            return (
+              <Pressable
+                key={m.id}
+                accessibilityRole="button"
+                accessibilityLabel={m.label}
+                onPress={() => {
+                  barcodeFired.current = false
+                  setMode(m.id)
+                }}
+                style={[styles.modePill, active && styles.modePillActive]}
+              >
+                <Icon name={m.icon} size={18} color={active ? '#000' : '#fff'} />
+                <Text style={[type.label, { color: active ? '#000' : '#fff' }]}>{m.label}</Text>
+              </Pressable>
+            )
+          })}
+        </View>
+
+        {mode === 'barcode' ? (
+          <Text style={[type.caption, styles.hint]}>Point at the barcode — it scans on its own</Text>
+        ) : (
+          <Pressable
+            accessibilityRole="button"
+            accessibilityLabel="Take photo"
+            onPress={capture}
+            disabled={busy}
+            style={[styles.shutter, busy && { opacity: 0.5 }]}
+          />
+        )}
       </View>
 
       <Pressable
@@ -110,7 +163,20 @@ const styles = StyleSheet.create({
     minHeight: MIN_TAP_TARGET,
     justifyContent: 'center',
   },
-  shutterRow: { position: 'absolute', left: 0, right: 0, bottom: 0, alignItems: 'center' },
+  controls: { position: 'absolute', left: 0, right: 0, bottom: 0, alignItems: 'center', gap: space.lg },
+  modeRow: { flexDirection: 'row', gap: space.sm },
+  modePill: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: space.xs,
+    paddingHorizontal: space.md,
+    paddingVertical: space.sm,
+    borderRadius: radius.md,
+    backgroundColor: 'rgba(0,0,0,0.45)',
+    minHeight: MIN_TAP_TARGET,
+  },
+  modePillActive: { backgroundColor: '#fff' },
+  hint: { color: 'rgba(255,255,255,0.85)', paddingVertical: space.lg },
   shutter: {
     width: 74,
     height: 74,

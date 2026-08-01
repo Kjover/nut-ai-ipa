@@ -8,14 +8,16 @@ import {
   StyleSheet,
   Text,
   TextInput,
+  useWindowDimensions,
   View,
 } from 'react-native'
 import { useSafeAreaInsets } from 'react-native-safe-area-context'
 import type { WebLookupResult } from '@nutai/core-schema'
+import { healthScore } from '@nutai/totals'
 import { ConfidenceChip, ConfidenceReasons } from '../src/components/ConfidenceChip'
-import { Icon } from '../src/components/Icon'
+import { Icon, type IconName } from '../src/components/Icon'
 import { logMeal } from '../src/data/repo'
-import { lookupOther, retryScan } from '../src/scan/orchestrator'
+import { fixScan, lookupOther, retryScan } from '../src/scan/orchestrator'
 import {
   answerQuestion,
   applyWebOption,
@@ -47,6 +49,8 @@ export default function Result() {
   const phase = useScan()
   const [expandedBand, setExpandedBand] = useState(false)
   const [logging, setLogging] = useState(false)
+  const [fixOpen, setFixOpen] = useState(false)
+  const [fixText, setFixText] = useState('')
 
   if (phase.kind === 'analyzing' || phase.kind === 'captured') {
     const stage = phase.kind === 'analyzing' ? phase.stage : 'preparing'
@@ -138,11 +142,10 @@ export default function Result() {
           </View>
         </View>
 
-        <View style={styles.macroRow}>
-          <Macro label="Protein" value={result.totals.protein_g} color={theme.protein} />
-          <Macro label="Carbs" value={result.totals.carbs_g} color={theme.carbs} />
-          <Macro label="Fat" value={result.totals.fat_g} color={theme.fat} />
-        </View>
+        <StatsPager
+          totals={result.totals}
+          grams={result.meal.ingredients.reduce((a, r) => a + r.grams, 0)}
+        />
 
         {/* Highlighted questions: at most two, ever. */}
         {highlighted.map((q) => (
@@ -222,27 +225,87 @@ export default function Result() {
       </ScrollView>
 
       <View style={[styles.actions, { paddingBottom: Math.max(insets.bottom, space.lg), backgroundColor: theme.bg, borderColor: theme.border }]}>
-        <Pressable
-          accessibilityRole="button"
-          disabled={logging}
-          onPress={() => {
-            if (logging) return
-            setLogging(true)
-            void (async () => {
-              try {
-                await logMeal(result, phase.meta, phase.photoUri, Date.now())
-                reset()
-                router.dismissAll()
-              } catch {
-                setLogging(false)
-              }
-            })()
-          }}
-          style={[styles.primary, { backgroundColor: theme.text }, logging && { opacity: 0.6 }]}
-        >
-          <Text style={[type.bodyStrong, { color: theme.bg }]}>{logging ? 'Logging…' : 'Log it'}</Text>
-        </Pressable>
+        <View style={{ flexDirection: 'row', gap: space.md }}>
+          <Pressable
+            accessibilityRole="button"
+            onPress={() => setFixOpen(true)}
+            style={[styles.secondary, { borderColor: theme.border }]}
+          >
+            <Icon name="pencil" size={16} color={theme.text} />
+            <Text style={[type.bodyStrong, { color: theme.text }]}>Fix result</Text>
+          </Pressable>
+
+          <Pressable
+            accessibilityRole="button"
+            disabled={logging}
+            onPress={() => {
+              if (logging) return
+              setLogging(true)
+              void (async () => {
+                try {
+                  await logMeal(result, phase.meta, phase.photoUri, Date.now())
+                  reset()
+                  router.dismissAll()
+                } catch {
+                  setLogging(false)
+                }
+              })()
+            }}
+            style={[styles.primary, { flex: 1, backgroundColor: theme.text }, logging && { opacity: 0.6 }]}
+          >
+            <Text style={[type.bodyStrong, { color: theme.bg }]}>{logging ? 'Logging…' : 'Log it'}</Text>
+          </Pressable>
+        </View>
       </View>
+
+      {fixOpen ? (
+        <View style={[styles.fixOverlay, { backgroundColor: theme.bg, paddingTop: insets.top + space.xl }]}>
+          <View style={{ flexDirection: 'row', alignItems: 'center', gap: space.sm }}>
+            <Icon name="pencil" size={20} color={theme.text} />
+            <Text style={[type.title, { color: theme.text }]}>Fix result</Text>
+          </View>
+          <TextInput
+            autoFocus
+            multiline
+            placeholder="Describe what needs to be fixed"
+            placeholderTextColor={theme.textFaint}
+            value={fixText}
+            onChangeText={setFixText}
+            style={[styles.fixInput, { color: theme.text, borderColor: theme.border }]}
+          />
+          <View style={[styles.fixExample, { backgroundColor: theme.bgSunken }]}>
+            <Text style={[type.caption, { color: theme.textMuted, lineHeight: 19 }]}>
+              <Text style={{ fontWeight: '600' }}>Example:</Text> The wrap is missing the chicken and
+              avocado. Only what you mention gets changed — your other edits stay put.
+            </Text>
+          </View>
+          <View style={{ flex: 1 }} />
+          <Pressable
+            accessibilityRole="button"
+            disabled={!fixText.trim()}
+            onPress={() => {
+              const note = fixText.trim()
+              setFixOpen(false)
+              setFixText('')
+              if (note) void fixScan(note)
+            }}
+            style={[
+              styles.primary,
+              { backgroundColor: theme.text, marginBottom: Math.max(insets.bottom, space.lg) },
+              !fixText.trim() && { opacity: 0.4 },
+            ]}
+          >
+            <Text style={[type.bodyStrong, { color: theme.bg }]}>Update</Text>
+          </Pressable>
+          <Pressable
+            onPress={() => setFixOpen(false)}
+            hitSlop={space.md}
+            style={{ alignSelf: 'center', marginBottom: Math.max(insets.bottom, space.lg) }}
+          >
+            <Text style={[type.body, { color: theme.textMuted }]}>Cancel</Text>
+          </Pressable>
+        </View>
+      ) : null}
     </View>
   )
 }
@@ -345,17 +408,109 @@ function WebLookupCard({ rowId, state }: { rowId: string; state: WebLookupState 
   )
 }
 
-function Macro({ label, value, color }: { label: string; value: number; color: string }) {
+function Macro({
+  label,
+  value,
+  unit = 'g',
+  color,
+  icon,
+}: {
+  label: string
+  value: number
+  unit?: string
+  color: string
+  icon: IconName
+}) {
   const theme = useTheme()
   return (
     <View style={{ flex: 1 }}>
       <View style={{ flexDirection: 'row', alignItems: 'baseline', gap: 3 }}>
         <Text style={[type.heading, { color: theme.text }]}>{Math.round(value)}</Text>
-        <Text style={[type.caption, { color: theme.textFaint }]}>g</Text>
+        <Text style={[type.caption, { color: theme.textFaint }]}>{unit}</Text>
       </View>
       <View style={{ flexDirection: 'row', alignItems: 'center', gap: space.xs, marginTop: 2 }}>
-        <View style={{ width: 8, height: 8, borderRadius: 4, backgroundColor: color }} />
+        <Icon name={icon} size={14} color={color} />
         <Text style={[type.caption, { color: theme.textMuted }]}>{label}</Text>
+      </View>
+    </View>
+  )
+}
+
+/**
+ * Two stat pages, swipeable like the incumbent's: macros, then
+ * fiber/sugar/sodium with the health score. The score is arithmetic from
+ * @nutai/totals — tap it and every point shows its named rule.
+ */
+function StatsPager({ totals, grams }: { totals: Parameters<typeof healthScore>[0]; grams: number }) {
+  const theme = useTheme()
+  const { width } = useWindowDimensions()
+  const pageW = width - space.lg * 2
+  const [page, setPage] = useState(0)
+  const [showWhy, setShowWhy] = useState(false)
+  const hs = healthScore(totals, grams > 0 ? grams : undefined)
+
+  return (
+    <View style={{ marginTop: space.xl }}>
+      <ScrollView
+        horizontal
+        pagingEnabled
+        showsHorizontalScrollIndicator={false}
+        onMomentumScrollEnd={(e) => setPage(Math.round(e.nativeEvent.contentOffset.x / pageW))}
+      >
+        <View style={[styles.statsPage, { width: pageW }]}>
+          <Macro label="Protein" value={totals.protein_g} color={theme.protein} icon="protein" />
+          <Macro label="Carbs" value={totals.carbs_g} color={theme.carbs} icon="carbs" />
+          <Macro label="Fat" value={totals.fat_g} color={theme.fat} icon="fat" />
+        </View>
+
+        <View style={{ width: pageW }}>
+          <View style={styles.statsPage}>
+            <Macro label="Fiber" value={totals.fiber_g} color={theme.carbs} icon="fiber" />
+            <Macro label="Sugar" value={totals.sugar_g} color={theme.uncertain} icon="sugar" />
+            <Macro label="Sodium" value={totals.sodium_mg} unit="mg" color={theme.fat} icon="sodium" />
+          </View>
+
+          {hs ? (
+            <Pressable
+              onPress={() => setShowWhy((v) => !v)}
+              style={[styles.healthCard, { backgroundColor: theme.bgSunken }]}
+            >
+              <View style={{ flexDirection: 'row', alignItems: 'center', gap: space.sm }}>
+                <Icon name="heart" size={18} color={theme.protein} />
+                <Text style={[type.bodyStrong, { color: theme.text, flex: 1 }]}>Health score</Text>
+                <Text style={[type.bodyStrong, { color: theme.text }]}>{hs.score}/10</Text>
+              </View>
+              <View style={[styles.healthTrack, { backgroundColor: theme.bgElevated }]}>
+                <View
+                  style={[
+                    styles.healthFill,
+                    { width: `${hs.score * 10}%` as const, backgroundColor: theme.affirm },
+                  ]}
+                />
+              </View>
+              {showWhy &&
+                hs.reasons.map((r) => (
+                  <Text key={r} style={[type.caption, { color: theme.textMuted, marginTop: space.xs }]}>
+                    · {r}
+                  </Text>
+                ))}
+              {showWhy && (
+                <Text style={[type.micro, { color: theme.textFaint, marginTop: space.sm }]}>
+                  Computed by fixed rules from these totals — never by the AI.
+                </Text>
+              )}
+            </Pressable>
+          ) : null}
+        </View>
+      </ScrollView>
+
+      <View style={styles.dots}>
+        {[0, 1].map((i) => (
+          <View
+            key={i}
+            style={[styles.dot, { backgroundColor: i === page ? theme.text : theme.border }]}
+          />
+        ))}
       </View>
     </View>
   )
@@ -363,7 +518,33 @@ function Macro({ label, value, color }: { label: string; value: number; color: s
 
 const styles = StyleSheet.create({
   center: { flex: 1, alignItems: 'center', justifyContent: 'center', padding: space.xl },
-  macroRow: { flexDirection: 'row', marginTop: space.xl, gap: space.md },
+  statsPage: { flexDirection: 'row', gap: space.md },
+  dots: { flexDirection: 'row', justifyContent: 'center', gap: 6, marginTop: space.md },
+  dot: { width: 6, height: 6, borderRadius: 3 },
+  healthCard: { marginTop: space.lg, padding: space.lg, borderRadius: radius.lg },
+  healthTrack: { height: 6, borderRadius: 3, marginTop: space.md, overflow: 'hidden' },
+  healthFill: { height: 6, borderRadius: 3 },
+  secondary: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: space.xs,
+    paddingHorizontal: space.lg,
+    borderRadius: radius.pill,
+    borderWidth: 1,
+    minHeight: MIN_TAP_TARGET,
+  },
+  fixOverlay: { position: 'absolute', top: 0, left: 0, right: 0, bottom: 0, padding: space.lg },
+  fixInput: {
+    marginTop: space.xl,
+    borderWidth: 1,
+    borderRadius: radius.md,
+    padding: space.md,
+    minHeight: 88,
+    fontSize: 16,
+    textAlignVertical: 'top',
+  },
+  fixExample: { marginTop: space.lg, padding: space.lg, borderRadius: radius.lg },
   qCard: { marginTop: space.lg, padding: space.lg, borderRadius: radius.lg, borderWidth: 1 },
   chipRow: { flexDirection: 'row', flexWrap: 'wrap', gap: space.sm, marginTop: space.md },
   chip: {

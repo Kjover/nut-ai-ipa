@@ -1,7 +1,9 @@
 import {
   buildAnthropicRequest,
   buildGeminiRequest,
+  buildLabelScanRequest,
   buildOpenAIRequest,
+  buildReceiptScanRequest,
   buildWebLookupRequest,
   computeScanCost,
   type ProviderId,
@@ -226,6 +228,90 @@ export async function runScanWithFallback(
 
   const second = await runScan({ ...req, jsonSchema: null }, fetchImpl)
   return second.ok ? { ...second, usedSchemaFallback: true } : first
+}
+
+/**
+ * Nutrition-label transcription: one image in, one LabelPayload-shaped JSON
+ * out. No tools, no structured-output mode; validated by the caller.
+ */
+export async function runLabelScan(
+  provider: ProviderId,
+  input: { model: string; imageBase64: string },
+  credential: Credential,
+  fetchImpl: typeof fetch = fetch,
+  timeoutMs = 30_000,
+): Promise<WebLookupOutcome> {
+  return postVisionJson(provider, buildLabelScanRequest(provider, input, credential), fetchImpl, timeoutMs)
+}
+
+/** Receipt transcription: same transport, different instruction and validator. */
+export async function runReceiptScan(
+  provider: ProviderId,
+  input: { model: string; imageBase64: string },
+  credential: Credential,
+  fetchImpl: typeof fetch = fetch,
+  timeoutMs = 30_000,
+): Promise<WebLookupOutcome> {
+  return postVisionJson(provider, buildReceiptScanRequest(provider, input, credential), fetchImpl, timeoutMs)
+}
+
+async function postVisionJson(
+  provider: ProviderId,
+  built: { url: string; headers: Record<string, string>; body: unknown },
+  fetchImpl: typeof fetch,
+  timeoutMs: number,
+): Promise<WebLookupOutcome> {
+  const controller = new AbortController()
+  const timer = setTimeout(() => controller.abort(), timeoutMs)
+  try {
+    const res = await fetchImpl(built.url, {
+      method: 'POST',
+      headers: built.headers,
+      body: JSON.stringify(built.body),
+      signal: controller.signal,
+    })
+    const text = await res.text()
+    if (!res.ok) return { ok: false, error: classify(res.status, text) }
+
+    let j: Record<string, any>
+    try {
+      j = JSON.parse(text) as Record<string, any>
+    } catch {
+      return { ok: false, error: { kind: 'schema-violation', message: 'The provider returned malformed JSON.', retryable: false } }
+    }
+
+    let out: string | null = null
+    if (provider === 'anthropic') {
+      const texts = (j.content ?? []).filter((b: any) => b?.type === 'text')
+      out = texts.length ? texts[texts.length - 1].text : null
+    } else if (provider === 'openai') {
+      out = j.choices?.[0]?.message?.content ?? null
+    } else {
+      out = (j.candidates?.[0]?.content?.parts ?? []).map((p: any) => p?.text ?? '').join('') || null
+    }
+    if (!out) {
+      return { ok: false, error: { kind: 'schema-violation', message: 'The provider returned no text.', retryable: false } }
+    }
+
+    const fenced = out.replace(/```(?:json)?/g, '').trim()
+    const start = fenced.indexOf('{')
+    const end = fenced.lastIndexOf('}')
+    if (start < 0 || end <= start) {
+      return { ok: false, error: { kind: 'schema-violation', message: 'No JSON in the response.', retryable: false } }
+    }
+    try {
+      return { ok: true, raw: JSON.parse(fenced.slice(start, end + 1)) }
+    } catch {
+      return { ok: false, error: { kind: 'schema-violation', message: 'The response JSON did not parse.', retryable: false } }
+    }
+  } catch (err) {
+    if ((err as Error)?.name === 'AbortError') {
+      return { ok: false, error: { kind: 'timeout-ambiguous', message: 'The scan timed out.', retryable: false } }
+    }
+    return { ok: false, error: { kind: 'offline', message: 'No connection to the provider.', retryable: true } }
+  } finally {
+    clearTimeout(timer)
+  }
 }
 
 /**

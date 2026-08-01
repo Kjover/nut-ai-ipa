@@ -29,6 +29,9 @@ export type IconName =
   | 'chart'
   | 'person'
   | 'scan'
+  | 'barcode'
+  | 'nutritionLabel'
+  | 'receipt'
   | 'search'
   | 'bookmark'
   | 'dumbbell'
@@ -202,6 +205,31 @@ function render(name: IconName, c: string, s: Common) {
         <G>
           <Path {...s} d="M3.5 8.5v-3a2 2 0 0 1 2-2h3M15.5 3.5h3a2 2 0 0 1 2 2v3M20.5 15.5v3a2 2 0 0 1-2 2h-3M8.5 20.5h-3a2 2 0 0 1-2-2v-3" />
           <Circle {...s} cx="12" cy="12" r="3.2" />
+        </G>
+      )
+    case 'barcode':
+      // Frame corners plus the bar pattern.
+      return (
+        <G>
+          <Path {...s} d="M3.5 8v-2.5a2 2 0 0 1 2-2h2M16.5 3.5h2a2 2 0 0 1 2 2V8M20.5 16v2.5a2 2 0 0 1-2 2h-2M7.5 20.5h-2a2 2 0 0 1-2-2V16" />
+          <Path {...s} d="M7.5 9v6M10.5 9v6M13.5 9v6M16.5 9v6" />
+        </G>
+      )
+    case 'nutritionLabel':
+      // A nutrition-facts panel: bordered card, heavy title bar, value lines.
+      return (
+        <G>
+          <Rect {...s} x="5" y="3.5" width="14" height="17" rx="1.5" />
+          <Path {...s} d="M8 7h8" strokeWidth={2.6} />
+          <Path {...s} d="M8 11h8M8 14h8M8 17h5" />
+        </G>
+      )
+    case 'receipt':
+      // A slip with a torn zigzag bottom and item lines.
+      return (
+        <G>
+          <Path {...s} d="M6 3.5h12v15l-2-1.5-2 1.5-2-1.5-2 1.5-2-1.5-2 1.5v-15Z" />
+          <Path {...s} d="M9 7.5h6M9 10.5h6M9 13.5h3.5" />
         </G>
       )
     case 'search':

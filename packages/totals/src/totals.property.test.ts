@@ -195,6 +195,6 @@ describe('totals reconciliation property', () => {
 
   it('an empty meal is zero, not NaN', () => {
     const t = recomputeTotals(emptyMeal([]))
-    expect(t).toEqual({ kcal: 0, protein_g: 0, fat_g: 0, carbs_g: 0, fiber_g: 0, sodium_mg: 0 })
+    expect(t).toEqual({ kcal: 0, protein_g: 0, fat_g: 0, carbs_g: 0, fiber_g: 0, sugar_g: 0, sodium_mg: 0 })
   })
 })

@@ -27,6 +27,11 @@ describe('the system prompt', () => {
     expect(SYSTEM_PROMPT).toMatch(/SEPARATELY/)
   })
 
+  it('demands composite dishes decompose into per-component items', () => {
+    expect(SYSTEM_PROMPT).toMatch(/one item PER COMPONENT/)
+    expect(SYSTEM_PROMPT).toMatch(/"cheeseburger" as a single\s+item is WRONG/)
+  })
+
   it('tells the model to name hidden oil every single time', () => {
     expect(SYSTEM_PROMPT).toMatch(/stated_assumptions every single time/)
   })

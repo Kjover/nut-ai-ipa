@@ -20,7 +20,7 @@ import type { IngredientRow, LoggedMeal, MacroTotals } from '@nutai/core-schema'
  */
 
 export function zeroTotals(): MacroTotals {
-  return { kcal: 0, protein_g: 0, fat_g: 0, carbs_g: 0, fiber_g: 0, sodium_mg: 0 }
+  return { kcal: 0, protein_g: 0, fat_g: 0, carbs_g: 0, fiber_g: 0, sugar_g: 0, sodium_mg: 0 }
 }
 
 export function scaleTotals(t: MacroTotals, factor: number): MacroTotals {
@@ -30,6 +30,7 @@ export function scaleTotals(t: MacroTotals, factor: number): MacroTotals {
     fat_g: t.fat_g * factor,
     carbs_g: t.carbs_g * factor,
     fiber_g: t.fiber_g * factor,
+    sugar_g: t.sugar_g * factor,
     sodium_mg: t.sodium_mg * factor,
   }
 }
@@ -48,6 +49,7 @@ export function rowTotals(row: IngredientRow): MacroTotals {
     // itself (null vs 0) and is rendered distinctly in the UI; it cannot survive
     // addition.
     fiber_g: (s.fiber_g ?? 0) * factor,
+    sugar_g: (s.sugar_g ?? 0) * factor,
     sodium_mg: (s.sodium_mg ?? 0) * factor,
   }
 }
@@ -64,6 +66,7 @@ export function recomputeTotals(meal: LoggedMeal): MacroTotals {
     acc.fat_g += t.fat_g
     acc.carbs_g += t.carbs_g
     acc.fiber_g += t.fiber_g
+    acc.sugar_g += t.sugar_g
     acc.sodium_mg += t.sodium_mg
     return acc
   }, zeroTotals())
@@ -130,6 +133,7 @@ export interface DisplayTotals {
   fat_g: number
   carbs_g: number
   fiber_g: number
+  sugar_g: number
   sodium_mg: number
 }
 
@@ -158,6 +162,7 @@ export function toDisplayTotals(t: MacroTotals): DisplayTotals {
     fat_g,
     carbs_g,
     fiber_g: roundDisplayGrams(t.fiber_g),
+    sugar_g: roundDisplayGrams(t.sugar_g),
     sodium_mg: Math.round(t.sodium_mg),
   }
 }
@@ -225,3 +230,5 @@ export const labelRounding = {
     return Math.round(pct / 10) * 10
   },
 } as const
+
+export * from './health-score.js'

@@ -159,7 +159,7 @@ export async function runPipeline(
       refusalReason: payload.refusal_reason,
       items: [],
       meal: emptyMeal(deps.now),
-      totals: toDisplayTotals({ kcal: 0, protein_g: 0, fat_g: 0, carbs_g: 0, fiber_g: 0, sodium_mg: 0 }),
+      totals: toDisplayTotals({ kcal: 0, protein_g: 0, fat_g: 0, carbs_g: 0, fiber_g: 0, sugar_g: 0, sodium_mg: 0 }),
       mealBand: { halfPct: 0, tier: 'none', reasons: [] },
       questions: [],
       clampFlags: flags,
