@@ -1,0 +1,33 @@
+{
+  "provenance": "seeded",
+  "generatedAt": null,
+  "_comment": "SEEDED from the §4.9 literature table, every value traceable to a cited MAPE/PMAE figure. These are NOT measured. The 'How accurate is this?' page must show that distinction, because claiming a measured number we have not measured is the exact dishonesty this product exists to avoid. A golden-set run replaces these and flips provenance to 'measured'.",
+  "mapeByStratum": {
+    "A_single_whole_food": 0.18,
+    "B_packaged_labeled": 0.03,
+    "C_simple_cooked": 0.25,
+    "D_mixed_composite": 0.45,
+    "E_hidden_fat": 0.42,
+    "F_liquid_beverage": 0.3,
+    "G_cuisine_diverse": 0.4,
+    "H_test_retest": 0.2
+  },
+  "bandCoverageByStratum": {
+    "A_single_whole_food": 0.75,
+    "B_packaged_labeled": 0.75,
+    "C_simple_cooked": 0.75,
+    "D_mixed_composite": 0.75,
+    "E_hidden_fat": 0.75,
+    "F_liquid_beverage": 0.75,
+    "G_cuisine_diverse": 0.75,
+    "H_test_retest": 0.75
+  },
+  "sources": {
+    "A_single_whole_food": "Lo 2024: MAE 69.2+/-34.7 kcal, single food",
+    "B_packaged_labeled": "Exact label arithmetic; 21 CFR 101.9(c) rounding only",
+    "D_mixed_composite": "Lo 2024: MAE 151.2+/-125.3 kcal mixed meal; Cinar 2026: up to 54% on complex plates",
+    "E_hidden_fat": "Oil absorption 10-28% by weight, invisible in a finished dish",
+    "F_liquid_beverage": "ABV spans 4.2-10% for a 12oz 'beer' — ~2.4x the alcohol",
+    "external_reference": "ACETADA (Purdue controlled-feeding RCT, weighed to 0.1g): GPT-4o 165.8 kcal MAE, Claude 3.7 Sonnet 181.7, Gemini 2.5 Pro 211.0. Fridolfsson 2025: GPT-4o 36.3% weight MAPE, Claude 3.5 Sonnet 37.3%."
+  }
+}

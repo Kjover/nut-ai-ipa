@@ -1,0 +1,15 @@
+{
+  "name": "@nutai/eval",
+  "version": "0.0.0",
+  "private": true,
+  "license": "AGPL-3.0-or-later",
+  "type": "module",
+  "main": "./src/index.ts",
+  "dependencies": {
+    "@nutai/core-schema": "*",
+    "@nutai/pipeline": "*",
+    "@nutai/confidence": "*",
+    "@nutai/db-adapter": "*",
+    "@nutai/gram-engine": "*"
+  }
+}

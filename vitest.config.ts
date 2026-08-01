@@ -24,6 +24,7 @@ export default defineConfig({
       '@nutai/db-adapter': pkg('db-adapter'),
       '@nutai/clamp': pkg('clamp'),
       '@nutai/pipeline': pkg('pipeline'),
+      '@nutai/eval': fileURLToPath(new URL('./eval/src/index.ts', import.meta.url)),
     },
   },
   test: {

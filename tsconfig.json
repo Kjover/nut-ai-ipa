@@ -45,6 +45,9 @@
       ],
       "@nutai/pipeline": [
         "packages/pipeline/src/index.ts"
+      ],
+      "@nutai/eval": [
+        "eval/src/index.ts"
       ]
     },
     "lib": [
