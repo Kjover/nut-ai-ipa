@@ -3,6 +3,7 @@
   "compilerOptions": {
     "strict": true,
     "paths": {
+      "@nutai/db-adapter/node": ["../../packages/db-adapter/src/node.ts"],
       "@nutai/*": ["../../packages/*/src/index.ts"]
     }
   },

@@ -75,6 +75,49 @@ rule: the accuracy harness has to run the *real* gram engine and resolver agains
 those become RN-only, the harness can only score raw model output — which measures the wrong thing,
 because most of the accuracy lives between the model and the number.
 
+## Put it on your phone
+
+You build it yourself — that is the deal with an app that has no server, no account, and no store
+listing taking a cut. One-time setup, ~20 minutes.
+
+**iPhone** (needs a Mac with [Xcode](https://apps.apple.com/app/xcode/id497799835)):
+
+```bash
+git clone https://github.com/Blueturboguy07/nut-ai.git
+cd nut-ai && npm install
+npm run data:build                      # builds the bundled USDA nutrition database
+cd apps/mobile && npm run prebuild      # generates the native project
+open ios/NutAI.xcworkspace              # then: pick your phone, press Run (⌘R)
+```
+
+Xcode will ask you to pick a signing team the first time — your free Apple ID works (apps signed
+this way re-install every 7 days; a $99/yr developer account removes that limit).
+
+**Android** (any computer with [Android Studio](https://developer.android.com/studio)'s SDK):
+
+```bash
+git clone https://github.com/Blueturboguy07/nut-ai.git
+cd nut-ai && npm install
+npm run data:build
+cd apps/mobile && npx expo run:android --variant release   # phone plugged in, USB debugging on
+```
+
+Photo scans use your own AI key (Anthropic, OpenAI, or Google), added during onboarding or later in
+Profile — typically well under a cent per scan, and the app works without one for barcode, label,
+search and manual logging.
+
+## Your data stays yours
+
+- Everything lives in a local SQLite database on the phone. **App updates never touch it**, on
+  either platform. The only thing that deletes it is you: "Start over" in Profile, or uninstalling
+  the app.
+- **Export data** in Profile writes one JSON file with every meal, weight, workout, goal and
+  setting. **Restore from a backup** on the first onboarding screen (or Import in Profile) brings
+  it all back — that is the move-to-a-new-phone path.
+- Your API key is the one thing a backup never contains: keys live in the OS Keychain/Keystore,
+  out-of-band from your data, and are never written to any file. Re-enter the key once after a
+  restore.
+
 ## Development
 
 Requires Node ≥ 20.19.

@@ -6,7 +6,8 @@ import { GestureHandlerRootView } from 'react-native-gesture-handler'
 import { SafeAreaProvider } from 'react-native-safe-area-context'
 import { ThemeProvider, useTheme } from '../src/theme/ThemeProvider'
 
-export const ONBOARDING_DONE_KEY = 'onboarding.completed.v1'
+import { ONBOARDING_DONE_KEY } from '../src/onboarding/done-key'
+export { ONBOARDING_DONE_KEY }
 
 /**
  * The entry gate.
@@ -54,6 +55,7 @@ function Root() {
         <Stack.Screen name="camera" options={{ presentation: 'modal' }} />
         <Stack.Screen name="result" options={{ presentation: 'modal' }} />
         <Stack.Screen name="log-weight" options={{ presentation: 'modal' }} />
+        <Stack.Screen name="provider-settings" options={{ presentation: 'modal' }} />
         <Stack.Screen name="log-exercise" options={{ presentation: 'modal' }} />
         <Stack.Screen name="food-search" options={{ presentation: 'modal' }} />
         <Stack.Screen name="saved-foods" options={{ presentation: 'modal' }} />

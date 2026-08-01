@@ -2,7 +2,7 @@ import Storage from 'expo-sqlite/kv-store'
 import { migrate } from '@nutai/db-adapter'
 import type { CalorieTarget, MacroTargets } from '@nutai/goals'
 import { openUserDb } from '../db/expo-adapter'
-import { ONBOARDING_DONE_KEY } from '../../app/_layout'
+import { ONBOARDING_DONE_KEY } from './done-key'
 import {
   activityFor,
   ageFrom,
@@ -102,8 +102,11 @@ export async function persistOnboarding(
       ['healthScore.visible', features.showHealthScore ? 'true' : 'false'],
       ['mealIdeas.visible', features.showMealIdeas ? 'true' : 'false'],
       ['health.intent', answers.healthConnected ? 'true' : 'false'],
-      ['inference.provider', answers.provider ?? 'none'],
-      ['inference.model', answers.providerModel ?? ''],
+      // THE canonical keys the scan orchestrator reads. The apikey screen
+      // writes these on verify too; writing here as well covers the skip path
+      // and keeps one vocabulary — the old inference.* mirror keys are gone.
+      ['provider', answers.provider ?? 'none'],
+      ['provider_model', answers.providerModel ?? ''],
       ['age.years', String(ageFrom(answers, now))],
     ]
 

@@ -71,6 +71,17 @@ export default function Welcome() {
         <Text style={[type.caption, { color: theme.textMuted, textAlign: 'center', marginTop: space.lg }]}>
           No account. No subscription. Your food data never leaves this device.
         </Text>
+
+        <Pressable
+          accessibilityRole="button"
+          onPress={() => router.push('/onboarding/restore' as never)}
+          hitSlop={space.sm}
+          style={{ marginTop: space.md, alignSelf: 'center' }}
+        >
+          <Text style={[type.label, { color: theme.textMuted, textDecorationLine: 'underline' }]}>
+            Restore from a backup
+          </Text>
+        </Pressable>
       </View>
     </View>
   )

@@ -10,7 +10,8 @@ import {
   type WeightPoint,
 } from '@nutai/goals'
 import Storage from 'expo-sqlite/kv-store'
-import { ONBOARDING_DONE_KEY } from '../../app/_layout'
+import { ONBOARDING_DONE_KEY } from '../onboarding/done-key'
+import { EXPORT_TABLES, WIPE_ONLY_TABLES } from './backup-core'
 import { clearCredential } from '../inference/credentials'
 import { openUserDb } from '../db/expo-adapter'
 
@@ -53,12 +54,9 @@ export function localDate(ms: number): string {
  */
 export async function resetEverything(): Promise<void> {
   const h = await db()
-  const tables = [
-    'log_items', 'meals', 'weight_entries', 'water_entries', 'exercise_entries',
-    'day_summaries', 'goals', 'user_profile', 'settings', 'personal_gram_priors',
-    'food_attribute_memory', 'user_containers', 'saved_meals', 'scan_cost_ledger',
-    'scan_cache', 'consents', 'accuracy_baselines', 'user_foods',
-  ]
+  // ONE source of truth for "what counts as user data": the backup lists.
+  // Children before parents, so foreign keys never block the wipe.
+  const tables: string[] = [...([...EXPORT_TABLES] as string[]).reverse(), ...WIPE_ONLY_TABLES]
   await h.transaction(async (tx) => {
     for (const t of tables) {
       // A missing table is not an error here — an interrupted migration should

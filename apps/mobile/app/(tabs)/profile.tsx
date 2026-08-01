@@ -1,10 +1,14 @@
 import { router, useFocusEffect } from 'expo-router'
 import { useCallback, useState } from 'react'
-import { Alert } from 'react-native'
+import { Alert, Linking } from 'react-native'
 import { Pressable, ScrollView, StyleSheet, Text, View } from 'react-native'
 import { useSafeAreaInsets } from 'react-native-safe-area-context'
-import { availability } from '../../src/health/healthkit'
+import type { ProviderId } from '@nutai/prompt'
+import { availability, requestPermissions } from '../../src/health/healthkit'
+import { exportAndShareBackup, finishRestore, importBackup, pickBackupFile } from '../../src/data/backup'
 import { currentGoal, resetEverything, setting, type CurrentGoal } from '../../src/data/repo'
+import { loadCredential, maskCredential } from '../../src/inference/credentials'
+import { PROVIDER_NAME } from '../../src/components/CredentialForm'
 import { Icon } from '../../src/components/Icon'
 import { useTheme } from '../../src/theme/ThemeProvider'
 import { radius, space, type } from '../../src/theme/tokens'
@@ -28,34 +32,122 @@ export default function Profile() {
   const insets = useSafeAreaInsets()
 
   const [goal, setGoal] = useState<CurrentGoal | null>(null)
-  const [healthState, setHealthState] = useState<string>('Checking…')
+  const [healthAvail, setHealthAvail] = useState<'available' | 'not-ios' | 'unavailable' | 'checking'>('checking')
+  const [healthBusy, setHealthBusy] = useState(false)
   const [diet, setDiet] = useState('')
+  const [providerLabel, setProviderLabel] = useState('—')
+  const [dataBusy, setDataBusy] = useState(false)
 
   useFocusEffect(
     useCallback(() => {
       let alive = true
       void (async () => {
-        const [g, avail, d] = await Promise.all([
+        const [g, avail, d, p] = await Promise.all([
           currentGoal(),
           availability(),
           setting('diet.style', 'balanced'),
+          setting('provider'),
         ])
         if (!alive) return
         setGoal(g)
         setDiet(d)
-        setHealthState(
-          avail === 'available'
-            ? 'Available'
-            : avail === 'not-ios'
-              ? 'iOS only'
-              : 'Unavailable on this device',
-        )
+        setHealthAvail(avail === 'available' ? 'available' : avail === 'not-ios' ? 'not-ios' : 'unavailable')
+        if (!p || p === 'none') {
+          setProviderLabel('Not connected')
+        } else {
+          const cred = await loadCredential(p as ProviderId)
+          if (!alive) return
+          setProviderLabel(
+            cred
+              ? `${PROVIDER_NAME[p as ProviderId]} · ${maskCredential(cred.value)}`
+              : `${PROVIDER_NAME[p as ProviderId]} · key missing`,
+          )
+        }
       })()
       return () => {
         alive = false
       }
     }, []),
   )
+
+  function connectHealth() {
+    if (healthBusy) return
+    setHealthBusy(true)
+    void (async () => {
+      const res = await requestPermissions()
+      setHealthBusy(false)
+      // iOS never reports whether READ access was granted — claiming success
+      // here would be a lie. Say what actually happened and point at Settings.
+      if (res.prompted) {
+        Alert.alert('Done', 'If you allowed access, steps and workouts will appear as they sync.')
+      } else {
+        Alert.alert(
+          'Health did not respond',
+          'Manage access under Settings → Privacy & Security → Health, or from the button below.',
+        )
+      }
+    })()
+  }
+
+  function exportData() {
+    if (dataBusy) return
+    setDataBusy(true)
+    void (async () => {
+      try {
+        const res = await exportAndShareBackup()
+        if (!res.shared) Alert.alert('Exported', `Saved to ${res.name}. Sharing is unavailable on this device.`)
+      } catch {
+        Alert.alert('Export failed', 'Could not write the backup file. Try again.')
+      } finally {
+        setDataBusy(false)
+      }
+    })()
+  }
+
+  function importData() {
+    if (dataBusy) return
+    void (async () => {
+      const picked = await pickBackupFile()
+      if (!picked.ok) {
+        if (picked.reason !== 'cancelled') {
+          Alert.alert('Not a backup', "That doesn't look like a Nut AI backup file.")
+        }
+        return
+      }
+      Alert.alert(
+        'Restore this backup?',
+        'This replaces ALL data currently on this device and cannot be undone.',
+        [
+          { text: 'Cancel', style: 'cancel' },
+          {
+            text: 'Restore',
+            style: 'destructive',
+            onPress: () => {
+              setDataBusy(true)
+              void (async () => {
+                try {
+                  const outcome = await importBackup(picked.payload)
+                  if (!outcome.ok) {
+                    Alert.alert('Cannot restore', 'This backup is from a newer version of Nut AI — update the app first.')
+                    return
+                  }
+                  await finishRestore()
+                  router.replace('/(tabs)' as never)
+                } catch (e) {
+                  // A restore that fails must SAY SO — the transaction rolled
+                  // back, nothing was lost, and silence here cost us a real
+                  // debugging session once already.
+                  Alert.alert('Restore failed', `Nothing was changed. ${String((e as Error)?.message ?? e)}`)
+                } finally {
+                  setDataBusy(false)
+                }
+              })()
+            },
+          },
+        ],
+      )
+    })()
+  }
 
   return (
     <ScrollView
@@ -85,11 +177,42 @@ export default function Profile() {
         />
         <Row label="Log weight" value="" onPress={() => router.push('/log-weight' as never)} />
         <Row label="Diet style" value={diet} />
-        <Row label="Apple Health" value={healthState} />
         <Row
           label="Adaptive target"
           value={goal ? (goal.adaptive ? 'On' : 'Off — set by hand') : '—'}
         />
+      </Section>
+
+      <Section title="AI provider">
+        <Row label="Provider & key" value={providerLabel} onPress={() => router.push('/provider-settings' as never)} />
+      </Section>
+
+      <Section title="Apple Health">
+        {healthAvail === 'available' ? (
+          <>
+            <Row
+              label={healthBusy ? 'Connecting…' : 'Connect / Reconnect'}
+              value=""
+              onPress={connectHealth}
+            />
+            <Pressable onPress={() => void Linking.openSettings()} style={{ padding: space.lg, paddingTop: 0 }}>
+              <Text style={[type.caption, { color: theme.textMuted }]}>
+                Already answered the prompt? <Text style={{ color: theme.protein }}>Manage access in Settings</Text>
+              </Text>
+            </Pressable>
+          </>
+        ) : (
+          <Row label="Apple Health" value={healthAvail === 'not-ios' ? 'iOS only' : 'Unavailable on this device'} />
+        )}
+      </Section>
+
+      <Section title="Your data">
+        <Row label={dataBusy ? 'Working…' : 'Export data'} value="" onPress={exportData} />
+        <Row label="Import data" value="" onPress={importData} />
+        <Text style={[type.caption, { color: theme.textFaint, padding: space.lg, paddingTop: space.xs, lineHeight: 18 }]}>
+          One JSON file with everything: meals, weights, goals, settings. Your API key never
+          travels in it — re-enter that once after restoring on a new phone.
+        </Text>
       </Section>
 
       <Section title="How your numbers work">
