@@ -1,2 +1,3 @@
-// @nutai/prompt — pure TypeScript, no React Native surface (PLAN.md §4.1).
-export const PACKAGE_NAME = '@nutai/prompt'
+export * from './system-prompt.js'
+export * from './local-signals.js'
+export * from './providers.js'
