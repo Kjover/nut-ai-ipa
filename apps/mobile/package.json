@@ -9,8 +9,9 @@
     "start:go": "expo start",
     "android": "expo run:android",
     "ios": "expo run:ios",
-    "prebuild": "expo prebuild --clean",
-    "typecheck": "tsc --noEmit -p tsconfig.json"
+    "prebuild": "expo prebuild --clean && node scripts/use-release-scheme.mjs",
+    "typecheck": "tsc --noEmit -p tsconfig.json",
+    "use-release": "node scripts/use-release-scheme.mjs"
   },
   "dependencies": {
     "@kingstinct/react-native-healthkit": "^14.0.2",
