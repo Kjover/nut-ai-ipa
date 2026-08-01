@@ -11,6 +11,7 @@ import {
   type NativeScrollEvent,
   type NativeSyntheticEvent,
 } from 'react-native'
+import { Icon, type IconName } from '../Icon'
 import { useTheme } from '../../theme/ThemeProvider'
 import { MIN_TAP_TARGET, radius, space, type } from '../../theme/tokens'
 
@@ -31,7 +32,7 @@ export function OptionCard({
 }: {
   label: string
   sublabel?: string
-  glyph: string
+  glyph: IconName
   selected: boolean
   onPress: () => void
 }) {
@@ -55,7 +56,7 @@ export function OptionCard({
       ]}
     >
       <View style={[styles.glyphCircle, { backgroundColor: theme.isDark ? theme.bgSunken : '#F3F2F8' }]}>
-        <Text style={{ fontSize: 20 }}>{glyph}</Text>
+        <Icon name={glyph} size={24} color={theme.text} />
       </View>
 
       <View style={{ flex: 1 }}>
@@ -335,7 +336,9 @@ export function EditableValue({
           <Text style={[styles.readoutValue, { color: theme.text }]}>
             {value.toFixed(1)} {unit}
           </Text>
-          <Text style={[type.caption, { color: theme.textFaint, marginLeft: space.sm }]}>✎</Text>
+          <View style={{ marginLeft: space.sm }}>
+            <Icon name="pencil" size={16} color={theme.textFaint} />
+          </View>
         </Pressable>
       )}
 

@@ -5,6 +5,7 @@ import { availability, requestPermissions, type HealthAvailability } from '../..
 import { OnboardingScreen } from '../../src/components/onboarding/Chrome'
 import { nextRoute, stepIndex, TOTAL_STEPS } from '../../src/onboarding/flow'
 import { setAnswer } from '../../src/onboarding/store'
+import { Icon } from '../../src/components/Icon'
 import { useTheme } from '../../src/theme/ThemeProvider'
 import { radius, space, type } from '../../src/theme/tokens'
 
@@ -89,11 +90,11 @@ export default function HealthScreen() {
         <View style={[styles.halo, { backgroundColor: theme.uncertainBg }]}>
           <View style={styles.row}>
             <View style={[styles.tile, { backgroundColor: theme.bgElevated, borderColor: theme.border }]}>
-              <Text style={{ fontSize: 34 }}>❤️</Text>
+              <Icon name="heart" size={34} color="#E8615A" />
             </View>
-            <Text style={{ color: theme.text, fontSize: 20 }}>→</Text>
+            <Icon name="chevron" size={20} color={theme.textMuted} />
             <View style={[styles.tile, { backgroundColor: theme.text }]}>
-              <Text style={{ fontSize: 34 }}>🥜</Text>
+              <Icon name="flame" size={34} color={theme.bg} />
             </View>
           </View>
           <View style={styles.wordRow}>

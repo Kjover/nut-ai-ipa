@@ -3,6 +3,7 @@ import { ScrollView } from 'react-native'
 import { nextRoute, stepIndex, TOTAL_STEPS, type Step } from '../../onboarding/flow'
 import { setAnswer, useAnswers, type OnboardingAnswers } from '../../onboarding/store'
 import { OnboardingScreen } from './Chrome'
+import type { IconName } from '../Icon'
 import { OptionCard } from './Controls'
 
 /**
@@ -17,7 +18,7 @@ export interface Option<V extends string> {
   value: V
   label: string
   sublabel?: string
-  glyph: string
+  glyph: IconName
 }
 
 export function OptionScreen<K extends keyof OnboardingAnswers>({

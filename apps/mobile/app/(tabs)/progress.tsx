@@ -5,6 +5,7 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context'
 import Svg, { Circle, Line as SvgLine, Path, Rect, Text as SvgText } from 'react-native-svg'
 import { bmi, computeTrend, trendSlopeLbPerWeek, type TrendPoint, type WeightPoint } from '@nutai/goals'
 import { currentGoal, db, setting, weightHistory, type CurrentGoal } from '../../src/data/repo'
+import { Icon } from '../../src/components/Icon'
 import { useTheme } from '../../src/theme/ThemeProvider'
 import { radius, space, type } from '../../src/theme/tokens'
 
@@ -88,12 +89,12 @@ export default function Progress() {
       {/* Streak credits logging INTENT, so our own failures never break it. */}
       <View style={styles.row}>
         <View style={[styles.tile, { backgroundColor: theme.bgSunken }]}>
-          <Text style={{ fontSize: 32 }}>🔥</Text>
+          <Icon name="flame" size={30} color={theme.text} />
           <Text style={[styles.tileNum, { color: theme.text }]}>{streak}</Text>
           <Text style={[type.caption, { color: theme.textMuted }]}>Day streak</Text>
         </View>
         <View style={[styles.tile, { backgroundColor: theme.bgSunken }]}>
-          <Text style={{ fontSize: 32 }}>⚖️</Text>
+          <Icon name="scale" size={30} color={theme.text} />
           <Text style={[styles.tileNum, { color: theme.text }]}>{raw.length}</Text>
           <Text style={[type.caption, { color: theme.textMuted }]}>Weigh-ins</Text>
         </View>
@@ -127,7 +128,7 @@ export default function Progress() {
         <View style={styles.spread}>
           <Text style={[type.heading, { color: theme.text }]}>Weight progress</Text>
           <View style={[styles.badge, { backgroundColor: theme.bgElevated }]}>
-            <Text style={[type.caption, { color: theme.text }]}>⚑ {Math.round(pctOfGoal * 100)}% of goal</Text>
+            <Text style={[type.caption, { color: theme.text }]}>{Math.round(pctOfGoal * 100)}% of goal</Text>
           </View>
         </View>
 
@@ -257,7 +258,7 @@ function ChangeRow({ label, lbs }: { label: string; lbs: number | null }) {
         {lbs == null ? '—' : `${lbs > 0 ? '+' : ''}${lbs.toFixed(1)} lbs`}
       </Text>
       <Text style={[type.caption, { color: none ? theme.textMuted : theme.protein }]}>
-        {none ? '→ No change' : up ? '↗ Increase' : '↘ Decrease'}
+        {none ? 'No change' : up ? 'Increase' : 'Decrease'}
       </Text>
     </View>
   )

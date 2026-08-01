@@ -8,9 +8,9 @@ export default function SexScreen() {
       title="Choose your sex"
       subtitle="This is used only for the BMR equation that sets your calorie target."
       options={[
-        { value: 'male', label: 'Male', glyph: '♂' },
-        { value: 'female', label: 'Female', glyph: '♀' },
-        { value: 'unspecified', label: 'Other', glyph: '◇' },
+        { value: 'male', label: 'Male', glyph: 'male' },
+        { value: 'female', label: 'Female', glyph: 'female' },
+        { value: 'unspecified', label: 'Other', glyph: 'nonbinary' },
       ]}
     />
   )

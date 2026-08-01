@@ -8,6 +8,7 @@ import {
   KCAL_PER_LB,
   type BodyInputs,
 } from '@nutai/goals'
+import { Icon, type IconName } from '../../src/components/Icon'
 import { ProgressChart } from '../../src/components/onboarding/Charts'
 import { persistOnboarding } from '../../src/onboarding/persist'
 import {
@@ -102,7 +103,7 @@ export default function PlanScreen() {
       >
         <View style={{ alignItems: 'center' }}>
           <View style={[styles.check, { backgroundColor: theme.text }]}>
-            <Text style={{ color: theme.bg, fontSize: 22 }}>✓</Text>
+            <Icon name="check" size={22} color={theme.bg} weight={2.4} />
           </View>
           <Text style={[styles.goal, { color: theme.text }]}>{goalLine}</Text>
         </View>
@@ -124,7 +125,7 @@ export default function PlanScreen() {
 
           <View style={[styles.bigCard, { backgroundColor: theme.bgElevated }]}>
             <View style={[styles.iconSq, { backgroundColor: theme.bgSunken }]}>
-              <Text style={{ fontSize: 20 }}>🔥</Text>
+              <Icon name="flame" size={20} color={theme.text} />
             </View>
             <View>
               <Text style={[styles.bigNum, { color: theme.text }]}>
@@ -135,9 +136,9 @@ export default function PlanScreen() {
           </View>
 
           <View style={styles.macroRow}>
-            <MacroCard label="Protein" value={plan.macros.protein_g} glyph="🍗" color={theme.protein} />
-            <MacroCard label="Carbs" value={plan.macros.carbs_g} glyph="🌾" color={theme.carbs} />
-            <MacroCard label="Fats" value={plan.macros.fat_g} glyph="💧" color={theme.fat} />
+            <MacroCard label="Protein" value={plan.macros.protein_g} icon="protein" color={theme.protein} />
+            <MacroCard label="Carbs" value={plan.macros.carbs_g} icon="carbs" color={theme.carbs} />
+            <MacroCard label="Fats" value={plan.macros.fat_g} icon="fat" color={theme.fat} />
           </View>
         </View>
 
@@ -187,10 +188,10 @@ export default function PlanScreen() {
             Based on your inputs.
           </Text>
           <View style={[styles.mathCard, { backgroundColor: theme.bgElevated }]}>
-            <InfoRow glyph="👤" label="Starting weight" value={`${kgToLb(a.weightKg ?? 80).toFixed(1)} lbs`} />
-            <InfoRow glyph="🚩" label="Goal weight" value={`${kgToLb(a.desiredWeightKg ?? a.weightKg ?? 80).toFixed(1)} lbs`} />
-            <InfoRow glyph="🏃" label="Activity level" value={activityFor(a.workoutsPerWeek)} />
-            {diet ? <InfoRow glyph="🥗" label="Diet" value={diet.label} /> : null}
+            <InfoRow icon="person" label="Starting weight" value={`${kgToLb(a.weightKg ?? 80).toFixed(1)} lbs`} />
+            <InfoRow icon="target" label="Goal weight" value={`${kgToLb(a.desiredWeightKg ?? a.weightKg ?? 80).toFixed(1)} lbs`} />
+            <InfoRow icon="steps" label="Activity level" value={activityFor(a.workoutsPerWeek)} />
+            {diet ? <InfoRow icon="bowl" label="Diet" value={diet.label} /> : null}
           </View>
         </View>
 
@@ -220,10 +221,10 @@ export default function PlanScreen() {
         <View style={[styles.section, { backgroundColor: theme.bgSunken }]}>
           <Text style={[type.heading, { color: theme.text }]}>How to reach your goals</Text>
           <View style={{ marginTop: space.md, gap: space.sm }}>
-            <HowRow glyph="🥑" text="Track your food" />
-            <HowRow glyph="🔥" text="Follow your daily calorie recommendation" />
-            <HowRow glyph="⚖️" text="Balance your carbs, protein and fat" />
-            <HowRow glyph="📈" text="Check the trend, not the daily number" />
+            <HowRow icon="scan" text="Track your food" />
+            <HowRow icon="flame" text="Follow your daily calorie recommendation" />
+            <HowRow icon="scaleBalance" text="Balance your carbs, protein and fat" />
+            <HowRow icon="chart" text="Check the trend, not the daily number" />
           </View>
         </View>
 
@@ -259,12 +260,12 @@ export default function PlanScreen() {
   )
 }
 
-function MacroCard({ label, value, glyph, color }: { label: string; value: number; glyph: string; color: string }) {
+function MacroCard({ label, value, icon, color }: { label: string; value: number; icon: IconName; color: string }) {
   const theme = useTheme()
   return (
     <View style={[styles.macroCard, { backgroundColor: theme.bgElevated }]}>
       <View style={[styles.iconSq, { backgroundColor: theme.bgSunken, width: 34, height: 34 }]}>
-        <Text style={{ fontSize: 15 }}>{glyph}</Text>
+        <Icon name={icon} size={18} color={color} />
       </View>
       <Text style={[styles.macroNum, { color: theme.text }]}>{Math.round(value)}g</Text>
       <View style={{ flexDirection: 'row', alignItems: 'center', gap: 5 }}>
@@ -287,11 +288,13 @@ function MathRow({ label, value, strong }: { label: string; value: string; stron
   )
 }
 
-function InfoRow({ glyph, label, value }: { glyph: string; label: string; value: string }) {
+function InfoRow({ icon, label, value }: { icon: IconName; label: string; value: string }) {
   const theme = useTheme()
   return (
     <View style={styles.mathRow}>
-      <Text style={{ fontSize: 15, width: 26 }}>{glyph}</Text>
+      <View style={{ width: 26 }}>
+        <Icon name={icon} size={17} color={theme.textMuted} />
+      </View>
       <Text style={[type.body, { color: theme.textMuted, flex: 1 }]}>{label}</Text>
       <Text style={[type.bodyStrong, { color: theme.text }]}>{value}</Text>
     </View>
@@ -308,11 +311,11 @@ function Bullet({ text }: { text: string }) {
   )
 }
 
-function HowRow({ glyph, text }: { glyph: string; text: string }) {
+function HowRow({ icon, text }: { icon: IconName; text: string }) {
   const theme = useTheme()
   return (
     <View style={[styles.howRow, { backgroundColor: theme.bgElevated }]}>
-      <Text style={{ fontSize: 22 }}>{glyph}</Text>
+      <Icon name={icon} size={22} color={theme.text} />
       <Text style={[type.bodyStrong, { color: theme.text, flex: 1 }]}>{text}</Text>
     </View>
   )

@@ -4,6 +4,7 @@ import { StyleSheet, Text, View } from 'react-native'
 import { OnboardingScreen } from '../../src/components/onboarding/Chrome'
 import { nextRoute, stepIndex, TOTAL_STEPS } from '../../src/onboarding/flow'
 import { setAnswer } from '../../src/onboarding/store'
+import { Icon } from '../../src/components/Icon'
 import { useTheme } from '../../src/theme/ThemeProvider'
 import { radius, space, type } from '../../src/theme/tokens'
 
@@ -55,7 +56,7 @@ function DayCard({
   return (
     <View style={[styles.card, { backgroundColor: theme.bgElevated, borderColor: theme.border }, style]}>
       <View style={styles.cardHead}>
-        <Text style={{ fontSize: 15 }}>🔥</Text>
+        <Icon name="flame" size={15} color={theme.text} />
         <Text style={[type.bodyStrong, { color: theme.text }]}>{day}</Text>
       </View>
 
@@ -66,7 +67,7 @@ function DayCard({
 
       {bonus != null ? (
         <View style={[styles.bonus, { backgroundColor: theme.uncertainBg }]}>
-          <Text style={[type.caption, { color: theme.protein, fontWeight: '700' }]}>↺ +{bonus}</Text>
+          <Text style={[type.caption, { color: theme.protein, fontWeight: '700' }]}>+{bonus}</Text>
         </View>
       ) : null}
 

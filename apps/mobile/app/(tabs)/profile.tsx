@@ -4,6 +4,7 @@ import { Pressable, ScrollView, StyleSheet, Text, View } from 'react-native'
 import { useSafeAreaInsets } from 'react-native-safe-area-context'
 import { availability } from '../../src/health/healthkit'
 import { currentGoal, setting, type CurrentGoal } from '../../src/data/repo'
+import { Icon } from '../../src/components/Icon'
 import { useTheme } from '../../src/theme/ThemeProvider'
 import { radius, space, type } from '../../src/theme/tokens'
 
@@ -135,7 +136,11 @@ function Row({ label, value, onPress }: { label: string; value: string; onPress?
     <View style={[styles.row, { borderBottomColor: theme.border }]}>
       <Text style={[type.body, { color: theme.text, flex: 1 }]}>{label}</Text>
       {value ? <Text style={[type.body, { color: theme.textMuted }]}>{value}</Text> : null}
-      {onPress ? <Text style={{ color: theme.textFaint, marginLeft: space.sm }}>›</Text> : null}
+      {onPress ? (
+        <View style={{ marginLeft: space.sm }}>
+          <Icon name="chevron" size={16} color={theme.textFaint} />
+        </View>
+      ) : null}
     </View>
   )
   return onPress ? (

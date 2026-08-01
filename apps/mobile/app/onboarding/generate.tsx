@@ -2,6 +2,7 @@ import { router } from 'expo-router'
 import { StyleSheet, Text, View } from 'react-native'
 import { OnboardingScreen } from '../../src/components/onboarding/Chrome'
 import { stepIndex, TOTAL_STEPS } from '../../src/onboarding/flow'
+import { Icon } from '../../src/components/Icon'
 import { useTheme } from '../../src/theme/ThemeProvider'
 import { radius, space, type } from '../../src/theme/tokens'
 
@@ -16,11 +17,11 @@ export default function GenerateScreen() {
     >
       <View style={{ alignItems: 'center' }}>
         <View style={[styles.halo, { borderColor: theme.uncertainBg }]}>
-          <Text style={{ fontSize: 72 }}>🫶</Text>
+          <Icon name="heart" size={72} color={theme.text} weight={1.4} />
         </View>
 
         <View style={styles.doneRow}>
-          <Text style={{ fontSize: 18 }}>✅</Text>
+          <Icon name="check" size={18} color={theme.affirm} weight={2.4} />
           <Text style={[type.bodyStrong, { color: theme.text }]}>All done!</Text>
         </View>
 

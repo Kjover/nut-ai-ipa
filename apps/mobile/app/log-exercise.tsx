@@ -3,6 +3,7 @@ import { useState } from 'react'
 import { Pressable, ScrollView, StyleSheet, Text, TextInput, View } from 'react-native'
 import { useSafeAreaInsets } from 'react-native-safe-area-context'
 import { db, localDate } from '../src/data/repo'
+import { Icon, type IconName } from '../src/components/Icon'
 import { useTheme } from '../src/theme/ThemeProvider'
 import { radius, space, type } from '../src/theme/tokens'
 
@@ -14,13 +15,13 @@ import { radius, space, type } from '../src/theme/tokens'
  * index on external_id enforces that at the database, not in a code path someone
  * can forget to call.
  */
-const PRESETS = [
-  { name: 'Walk', kcalPerMin: 4, glyph: '🚶' },
-  { name: 'Run', kcalPerMin: 11, glyph: '🏃' },
-  { name: 'Cycle', kcalPerMin: 8, glyph: '🚴' },
-  { name: 'Weights', kcalPerMin: 6, glyph: '🏋️' },
-  { name: 'Swim', kcalPerMin: 10, glyph: '🏊' },
-  { name: 'Other', kcalPerMin: 5, glyph: '⊕' },
+const PRESETS: ReadonlyArray<{ name: string; kcalPerMin: number; icon: IconName }> = [
+  { name: 'Walk', kcalPerMin: 4, icon: 'steps' },
+  { name: 'Run', kcalPerMin: 11, icon: 'flame' },
+  { name: 'Cycle', kcalPerMin: 8, icon: 'target' },
+  { name: 'Weights', kcalPerMin: 6, icon: 'dumbbell' },
+  { name: 'Swim', kcalPerMin: 10, icon: 'water' },
+  { name: 'Other', kcalPerMin: 5, icon: 'plus' },
 ]
 
 export default function LogExercise() {
@@ -70,7 +71,7 @@ export default function LogExercise() {
                 },
               ]}
             >
-              <Text style={{ fontSize: 26 }}>{p.glyph}</Text>
+              <Icon name={p.icon} size={26} color={theme.text} />
               <Text style={[type.label, { color: theme.text, marginTop: space.xs }]}>{p.name}</Text>
             </Pressable>
           ))}

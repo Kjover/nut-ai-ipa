@@ -2,6 +2,7 @@ import { router } from 'expo-router'
 import { StyleSheet, Text, View } from 'react-native'
 import { OnboardingScreen } from '../../src/components/onboarding/Chrome'
 import { nextRoute, stepIndex, TOTAL_STEPS } from '../../src/onboarding/flow'
+import { Icon } from '../../src/components/Icon'
 import { useTheme } from '../../src/theme/ThemeProvider'
 import { radius, space, type } from '../../src/theme/tokens'
 
@@ -27,7 +28,7 @@ export default function NotificationsScreen() {
       scroll
     >
       <View style={[styles.card, { backgroundColor: theme.bgSunken }]}>
-        <Text style={{ fontSize: 44 }}>🔔</Text>
+        <Icon name="clock" size={44} color={theme.text} weight={1.5} />
         <Text style={[type.bodyStrong, { color: theme.text, marginTop: space.md }]}>
           A nudge when you'd usually log
         </Text>

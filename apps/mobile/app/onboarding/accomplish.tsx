@@ -9,10 +9,10 @@ export default function AccomplishScreen() {
       // Consumer: todayEmphasisFor(). Decides what the Today screen leads with.
       subtitle="This decides what your Today screen puts first."
       options={[
-        { value: 'healthier', label: 'Eat and live healthier', glyph: '🍏' },
-        { value: 'energy', label: 'Boost my energy and mood', glyph: '☀️' },
-        { value: 'motivated', label: 'Stay motivated and consistent', glyph: '💪' },
-        { value: 'body_image', label: 'Feel better about my body', glyph: '🧘' },
+        { value: 'healthier', label: 'Eat and live healthier', glyph: 'apple' },
+        { value: 'energy', label: 'Boost my energy and mood', glyph: 'sun' },
+        { value: 'motivated', label: 'Stay motivated and consistent', glyph: 'muscle' },
+        { value: 'body_image', label: 'Feel better about my body', glyph: 'lotus' },
       ]}
       scroll
     />

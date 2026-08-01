@@ -2,6 +2,7 @@ import { router } from 'expo-router'
 import type { ReactNode } from 'react'
 import { Pressable, ScrollView, StyleSheet, Text, View } from 'react-native'
 import { useSafeAreaInsets } from 'react-native-safe-area-context'
+import { Icon } from '../Icon'
 import { useTheme } from '../../theme/ThemeProvider'
 import { MIN_TAP_TARGET, radius, space, type } from '../../theme/tokens'
 
@@ -42,7 +43,9 @@ export function OnboardingHeader({ step, total }: { step: number; total: number 
         hitSlop={space.sm}
         style={[styles.back, { backgroundColor: theme.isDark ? theme.bgElevated : '#F3F3F6' }]}
       >
-        <Text style={{ color: theme.text, fontSize: 20, lineHeight: 22 }}>←</Text>
+        <View style={{ transform: [{ rotate: '180deg' }] }}>
+          <Icon name="chevron" size={19} color={theme.text} weight={2.2} />
+        </View>
       </Pressable>
       <View style={{ flex: 1, marginLeft: space.lg, marginRight: space.xs }}>
         <ProgressBar step={step} total={total} />

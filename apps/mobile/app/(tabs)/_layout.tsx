@@ -2,6 +2,7 @@ import { Tabs, router } from 'expo-router'
 import { useState } from 'react'
 import { Modal, Pressable, StyleSheet, Text, View } from 'react-native'
 import { useSafeAreaInsets } from 'react-native-safe-area-context'
+import { Icon, type IconName } from '../../src/components/Icon'
 import { useTheme } from '../../src/theme/ThemeProvider'
 import { MIN_TAP_TARGET, radius, space, type } from '../../src/theme/tokens'
 
@@ -19,25 +20,23 @@ import { MIN_TAP_TARGET, radius, space, type } from '../../src/theme/tokens'
  * App Store Guideline 3.1.1 nothing to attach to.
  */
 
-const TABS = [
-  { name: 'index', label: 'Home', glyph: '⌂' },
-  { name: 'progress', label: 'Progress', glyph: '◪' },
-  { name: 'profile', label: 'Profile', glyph: '◉' },
-] as const
+const TABS: ReadonlyArray<{ name: string; label: string; icon: IconName }> = [
+  { name: 'index', label: 'Home', icon: 'home' },
+  { name: 'progress', label: 'Progress', icon: 'chart' },
+  { name: 'profile', label: 'Profile', icon: 'person' },
+]
 
 interface Action {
   label: string
-  glyph: string
+  icon: IconName
   route: string
-  enabled: boolean
-  note?: string
 }
 
 const ACTIONS: Action[] = [
-  { label: 'Scan food', glyph: '⛶', route: '/camera', enabled: true },
-  { label: 'Food Database', glyph: '⌕', route: '/food-search', enabled: true },
-  { label: 'Saved foods', glyph: '⚑', route: '/saved-foods', enabled: true },
-  { label: 'Log exercise', glyph: '⊕', route: '/log-exercise', enabled: true },
+  { label: 'Log exercise', icon: 'dumbbell', route: '/log-exercise' },
+  { label: 'Saved foods', icon: 'bookmark', route: '/saved-foods' },
+  { label: 'Food Database', icon: 'search', route: '/food-search' },
+  { label: 'Scan food', icon: 'scan', route: '/camera' },
 ]
 
 export default function TabLayout() {
@@ -64,9 +63,7 @@ export default function TabLayout() {
                     style={[styles.tab, focused && { backgroundColor: theme.bgSunken }]}
                     hitSlop={space.sm}
                   >
-                    <Text style={{ color: focused ? theme.text : theme.textFaint, fontSize: 17 }}>
-                      {tab.glyph}
-                    </Text>
+                    <Icon name={tab.icon} size={21} color={focused ? theme.text : theme.textFaint} />
                     <Text style={[type.micro, { color: focused ? theme.text : theme.textFaint, marginTop: 1 }]}>
                       {tab.label}
                     </Text>
@@ -81,7 +78,7 @@ export default function TabLayout() {
               onPress={() => setSheetOpen(true)}
               style={[styles.fab, { backgroundColor: theme.text }]}
             >
-              <Text style={{ color: theme.bg, fontSize: 28, lineHeight: 30, fontWeight: '300' }}>+</Text>
+              <Icon name="plus" size={26} color={theme.bg} weight={2.2} />
             </Pressable>
           </View>
         )}
@@ -104,7 +101,7 @@ export default function TabLayout() {
                 }}
                 style={[styles.action, { backgroundColor: theme.bgElevated }]}
               >
-                <Text style={{ fontSize: 26, color: theme.text }}>{a.glyph}</Text>
+                <Icon name={a.icon} size={28} color={theme.text} />
                 <Text style={[type.bodyStrong, { color: theme.text, marginTop: space.sm }]}>{a.label}</Text>
               </Pressable>
             ))}
@@ -118,7 +115,7 @@ export default function TabLayout() {
               onPress={() => setSheetOpen(false)}
               style={[styles.fab, { backgroundColor: theme.text }]}
             >
-              <Text style={{ color: theme.bg, fontSize: 24, lineHeight: 26 }}>×</Text>
+              <Icon name="close" size={22} color={theme.bg} weight={2.2} />
             </Pressable>
           </View>
         </Pressable>

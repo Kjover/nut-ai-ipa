@@ -11,11 +11,11 @@ export default function BlockerScreen() {
       // just being collected.
       subtitle="We'll turn on the parts of the app that help with this, and leave the rest off."
       options={[
-        { value: 'consistency', label: 'Lack of consistency', glyph: '📊' },
-        { value: 'eating_habits', label: 'Unhealthy eating habits', glyph: '🍔' },
-        { value: 'support', label: 'Lack of support', glyph: '🤝' },
-        { value: 'busy', label: 'Busy schedule', glyph: '📅' },
-        { value: 'meal_inspiration', label: 'Lack of meal inspiration', glyph: '🍎' },
+        { value: 'consistency', label: 'Lack of consistency', glyph: 'bars' },
+        { value: 'eating_habits', label: 'Unhealthy eating habits', glyph: 'burger' },
+        { value: 'support', label: 'Lack of support', glyph: 'handshake' },
+        { value: 'busy', label: 'Busy schedule', glyph: 'calendar' },
+        { value: 'meal_inspiration', label: 'Lack of meal inspiration', glyph: 'apple' },
       ]}
       scroll
     />

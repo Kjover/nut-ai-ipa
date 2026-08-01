@@ -22,13 +22,13 @@ export default function ProfessionalScreen() {
       <ScrollView scrollEnabled={false}>
         <OptionCard
           label="Yes"
-          glyph="👍"
+          glyph="thumbUp"
           selected={a.worksWithProfessional === true}
           onPress={() => setAnswer('worksWithProfessional', true)}
         />
         <OptionCard
           label="No"
-          glyph="👎"
+          glyph="thumbDown"
           selected={a.worksWithProfessional === false}
           onPress={() => setAnswer('worksWithProfessional', false)}
         />

@@ -11,13 +11,13 @@ export default function DietScreen() {
       // resolving to beef and "what kind of milk?" defaults to oat.
       subtitle="We use this to rank food matches and pick sensible defaults when a scan is unsure."
       options={[
-        { value: 'balanced', label: 'Balanced', glyph: '⚖️' },
-        { value: 'whole_food', label: 'Whole-food focus', glyph: '🥗' },
-        { value: 'mediterranean', label: 'Mediterranean', glyph: '🫒' },
-        { value: 'flexitarian', label: 'Flexitarian', glyph: '🥩' },
-        { value: 'pescatarian', label: 'Pescatarian', glyph: '🐟' },
-        { value: 'vegetarian', label: 'Vegetarian', glyph: '🥕' },
-        { value: 'vegan', label: 'Vegan', glyph: '🌱' },
+        { value: 'balanced', label: 'Balanced', glyph: 'scaleBalance' },
+        { value: 'whole_food', label: 'Whole-food focus', glyph: 'bowl' },
+        { value: 'mediterranean', label: 'Mediterranean', glyph: 'leaf' },
+        { value: 'flexitarian', label: 'Flexitarian', glyph: 'meat' },
+        { value: 'pescatarian', label: 'Pescatarian', glyph: 'fish' },
+        { value: 'vegetarian', label: 'Vegetarian', glyph: 'sprout' },
+        { value: 'vegan', label: 'Vegan', glyph: 'sprout' },
       ]}
       scroll
     />
