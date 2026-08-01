@@ -39,6 +39,9 @@
       ],
       "@nutai/clamp": [
         "packages/clamp/src/index.ts"
+      ],
+      "@nutai/db-adapter/node": [
+        "packages/db-adapter/src/node.ts"
       ]
     },
     "lib": [

@@ -20,6 +20,7 @@ export default defineConfig({
       '@nutai/repair': pkg('repair'),
       '@nutai/goals': pkg('goals'),
       '@nutai/prompt': pkg('prompt'),
+      '@nutai/db-adapter/node': fileURLToPath(new URL('./packages/db-adapter/src/node.ts', import.meta.url)),
       '@nutai/db-adapter': pkg('db-adapter'),
       '@nutai/clamp': pkg('clamp'),
     },
