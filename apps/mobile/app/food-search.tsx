@@ -1,11 +1,12 @@
+import { router } from 'expo-router'
 import { useEffect, useMemo, useState } from 'react'
-import { ActivityIndicator, ScrollView, StyleSheet, Text, TextInput, View } from 'react-native'
+import { ActivityIndicator, Pressable, ScrollView, StyleSheet, Text, TextInput, View } from 'react-native'
 import { useSafeAreaInsets } from 'react-native-safe-area-context'
 import type { DbAdapter } from '@nutai/db-adapter'
 import { resolveByText, type ScoredCandidate } from '@nutai/resolver'
-import { nutritionCorpusInfo, openNutritionDb } from '../../src/db/expo-adapter'
-import { useTheme } from '../../src/theme/ThemeProvider'
-import { radius, space, type } from '../../src/theme/tokens'
+import { nutritionCorpusInfo, openNutritionDb } from '../src/db/expo-adapter'
+import { useTheme } from '../src/theme/ThemeProvider'
+import { radius, space, type } from '../src/theme/tokens'
 
 /**
  * Foods — the library that replaces the incumbent's `Groups` social feed.
@@ -16,7 +17,7 @@ import { radius, space, type } from '../../src/theme/tokens'
  * auto-accept rule — against the real 7,928-row USDA corpus. Everything here is
  * local. No network request is made by this screen, ever.
  */
-export default function Foods() {
+export default function FoodSearch() {
   const theme = useTheme()
   const insets = useSafeAreaInsets()
 
@@ -81,7 +82,12 @@ export default function Foods() {
       keyboardShouldPersistTaps="handled"
       contentContainerStyle={{ padding: space.lg, paddingTop: insets.top + space.lg, paddingBottom: 160 }}
     >
-      <Text style={[type.title, { color: theme.text }]}>Foods</Text>
+      <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' }}>
+        <Text style={[type.title, { color: theme.text }]}>Food Database</Text>
+        <Pressable accessibilityRole="button" onPress={() => router.back()} hitSlop={space.md}>
+          <Text style={[type.body, { color: theme.textMuted }]}>Done</Text>
+        </Pressable>
+      </View>
       <Text style={[type.caption, { color: corpus?.foods === 0 ? theme.safety : theme.textMuted, marginTop: space.xs }]}>
         {corpusLine}
       </Text>

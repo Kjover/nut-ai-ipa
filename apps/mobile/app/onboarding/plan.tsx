@@ -15,6 +15,7 @@ import {
   ageFrom,
   DIET_BIAS,
   featureDefaultsFor,
+  inferredGoal,
   kgToLb,
   todayEmphasisFor,
   useAnswers,
@@ -47,6 +48,8 @@ export default function PlanScreen() {
   const insets = useSafeAreaInsets()
   const a = useAnswers()
 
+  const derivedGoal = inferredGoal(a)
+
   const plan = useMemo(() => {
     const body: BodyInputs = {
       sex: a.sex ?? 'unspecified',
@@ -60,15 +63,15 @@ export default function PlanScreen() {
     const deltaLb = Math.abs(kgToLb(targetKg) - kgToLb(currentKg))
 
     // A sane default rate, then let the floor clamp argue with it if it must.
-    const rate = a.goal === 'maintain' ? 0 : Math.min(1, Math.max(0.25, deltaLb / 12))
+    const rate = derivedGoal === 'maintain' ? 0 : Math.min(1, Math.max(0.25, deltaLb / 12))
 
     const target = computeCalorieTarget({
       ...body,
       activity: activityFor(a.workoutsPerWeek),
-      goal: a.goal ?? 'maintain',
+      goal: derivedGoal,
       rateLbPerWeek: rate,
     })
-    const macros = computeMacros(target.target, body.weightKg, a.goal ?? 'maintain')
+    const macros = computeMacros(target.target, body.weightKg, derivedGoal)
 
     // Target date from the actual arithmetic, not a flattering guess.
     const weeks = rate > 0 ? deltaLb / rate : 0
@@ -76,11 +79,11 @@ export default function PlanScreen() {
     const dateLabel = date.toLocaleDateString('en-US', { month: 'long', day: 'numeric' })
 
     return { target, macros, deltaLb, dateLabel, rate }
-  }, [a])
+  }, [a, derivedGoal])
 
-  const gaining = a.goal === 'gain'
+  const gaining = derivedGoal === 'gain'
   const goalLine =
-    a.goal === 'maintain'
+    derivedGoal === 'maintain'
       ? 'Goal: maintain your weight'
       : `Goal: ${gaining ? 'gain' : 'lose'} ${plan.deltaLb.toFixed(0)} lbs by ${plan.dateLabel}`
 
@@ -107,7 +110,7 @@ export default function PlanScreen() {
         <View style={{ marginTop: space.xl }}>
           <ProgressChart
             targetLabel={`${kgToLb(a.desiredWeightKg ?? a.weightKg ?? 80).toFixed(1)} lbs`}
-            dateLabel={a.goal === 'maintain' ? 'Ongoing' : plan.dateLabel}
+            dateLabel={derivedGoal === 'maintain' ? 'Ongoing' : plan.dateLabel}
             gaining={gaining}
           />
         </View>
@@ -167,7 +170,7 @@ export default function PlanScreen() {
               label={`× activity (${activityFor(a.workoutsPerWeek)})`}
               value={`${Math.round(plan.target.tdee)} kcal`}
             />
-            {a.goal !== 'maintain' ? (
+            {derivedGoal !== 'maintain' ? (
               <MathRow
                 label={`${gaining ? '+' : '−'} ${plan.rate.toFixed(2)} lb/week`}
                 value={`${gaining ? '+' : '−'}${Math.round((plan.rate * KCAL_PER_LB) / 7)} kcal`}

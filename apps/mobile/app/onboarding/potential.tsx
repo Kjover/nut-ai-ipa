@@ -2,7 +2,7 @@ import { router } from 'expo-router'
 import { TransitionChart } from '../../src/components/onboarding/Charts'
 import { OnboardingScreen } from '../../src/components/onboarding/Chrome'
 import { nextRoute, stepIndex, TOTAL_STEPS } from '../../src/onboarding/flow'
-import { useAnswers } from '../../src/onboarding/store'
+import { inferredGoal, useAnswers } from '../../src/onboarding/store'
 
 export default function PotentialScreen() {
   const a = useAnswers()
@@ -16,7 +16,7 @@ export default function PotentialScreen() {
     >
       {/* The curve follows the user's actual goal direction rather than always
           sloping the same way, so a gaining user is not shown a losing chart. */}
-      <TransitionChart gaining={a.goal === 'gain'} />
+      <TransitionChart gaining={inferredGoal(a) === 'gain'} />
     </OnboardingScreen>
   )
 }

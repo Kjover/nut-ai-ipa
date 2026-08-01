@@ -265,5 +265,32 @@ export function todayEmphasisFor(a: Accomplish | null): 'calories' | 'protein' |
 }
 
 export const LB_PER_KG = 2.20462
+
+/**
+ * Weight change below this is treated as "maintain".
+ *
+ * 2 lb is inside the range a single day of water, salt and timing can move you,
+ * so a target within 2 lb of today is not a direction — it is the same weight
+ * measured twice. Asking someone to also declare a goal after they have already
+ * told us both numbers is asking them to repeat themselves.
+ */
+export const MAINTAIN_THRESHOLD_LB = 2
+
+/**
+ * The goal, inferred.
+ *
+ * Current weight and target weight already contain the answer. A separate
+ * "what is your goal?" screen can only agree with them or contradict them, and
+ * when it contradicts them the app has to silently pick a winner.
+ */
+export function inferredGoal(a: Pick<OnboardingAnswers, 'weightKg' | 'desiredWeightKg'>): Goal {
+  const current = a.weightKg
+  const target = a.desiredWeightKg
+  if (current == null || target == null) return 'maintain'
+  const deltaLb = (target - current) * LB_PER_KG
+  if (Math.abs(deltaLb) < MAINTAIN_THRESHOLD_LB) return 'maintain'
+  return deltaLb > 0 ? 'gain' : 'lose'
+}
+
 export const lbToKg = (lb: number): number => lb / LB_PER_KG
 export const kgToLb = (kg: number): number => kg * LB_PER_KG

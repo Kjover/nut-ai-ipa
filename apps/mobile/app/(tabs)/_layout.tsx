@@ -1,89 +1,129 @@
-import { Tabs } from 'expo-router'
-import { router } from 'expo-router'
-import { Pressable, StyleSheet, Text, View } from 'react-native'
+import { Tabs, router } from 'expo-router'
+import { useState } from 'react'
+import { Modal, Pressable, StyleSheet, Text, View } from 'react-native'
 import { useSafeAreaInsets } from 'react-native-safe-area-context'
 import { useTheme } from '../../src/theme/ThemeProvider'
 import { MIN_TAP_TARGET, radius, space, type } from '../../src/theme/tokens'
 
 /**
- * The four tabs, with a custom tabBar renderer.
+ * Three tabs plus the detached FAB.
  *
- * SPEC-ui.md §2, PLAN.md D21. `Foods` replaces the incumbent's `Groups` social
- * feed: a feed cannot be local-first without a server we operate, it needs Apple
- * 1.2 moderation machinery, and it is the highest eating-disorder-risk surface in
- * the whole product. The third slot is better spent on the library that makes
- * repeat logging fast, which is the highest-leverage retention surface in any
- * tracker.
+ * GROUPS IS GONE. A social feed cannot be local-first without a server we
+ * operate, it needs Apple 1.2 moderation machinery before it can ship at all,
+ * and it is the highest eating-disorder-risk surface in this product category.
+ * Cutting it is the decision, not a gap.
  *
- * The default tab bar cannot render the floating pill plus a detached FAB, hence
- * the custom renderer.
+ * The FAB is ALWAYS present and ALWAYS opens real logging. The reference
+ * paywalls this button, which is the direct cause of its most-reported
+ * complaint. No IAP is configured anywhere in this project, which is what leaves
+ * App Store Guideline 3.1.1 nothing to attach to.
  */
 
 const TABS = [
-  { name: 'index', label: 'Today', glyph: '◍' },
-  { name: 'trends', label: 'Trends', glyph: '◔' },
-  { name: 'foods', label: 'Foods', glyph: '☰' },
-  { name: 'you', label: 'You', glyph: '◑' },
+  { name: 'index', label: 'Home', glyph: '⌂' },
+  { name: 'progress', label: 'Progress', glyph: '◪' },
+  { name: 'profile', label: 'Profile', glyph: '◉' },
 ] as const
+
+interface Action {
+  label: string
+  glyph: string
+  route: string
+  enabled: boolean
+  note?: string
+}
+
+const ACTIONS: Action[] = [
+  { label: 'Scan food', glyph: '⛶', route: '/camera', enabled: true },
+  { label: 'Food Database', glyph: '⌕', route: '/food-search', enabled: true },
+  { label: 'Saved foods', glyph: '⚑', route: '/saved-foods', enabled: true },
+  { label: 'Log exercise', glyph: '⊕', route: '/log-exercise', enabled: true },
+]
 
 export default function TabLayout() {
   const theme = useTheme()
   const insets = useSafeAreaInsets()
+  const [sheetOpen, setSheetOpen] = useState(false)
 
   return (
-    <Tabs
-      screenOptions={{ headerShown: false, sceneStyle: { backgroundColor: theme.bg } }}
-      tabBar={({ state, navigation }) => (
-        <View style={[styles.wrap, { paddingBottom: Math.max(insets.bottom, space.md) }]}>
-          <View style={[styles.pill, { backgroundColor: theme.bgElevated, borderColor: theme.border }]}>
-            {TABS.map((tab, i) => {
-              const focused = state.index === i
-              return (
-                <Pressable
-                  key={tab.name}
-                  accessibilityRole="tab"
-                  accessibilityState={{ selected: focused }}
-                  accessibilityLabel={tab.label}
-                  onPress={() => navigation.navigate(tab.name)}
-                  style={styles.tab}
-                  hitSlop={space.sm}
-                >
-                  <Text style={{ color: focused ? theme.text : theme.textFaint, fontSize: 18 }}>
-                    {tab.glyph}
-                  </Text>
-                  <Text
-                    style={[type.micro, { color: focused ? theme.text : theme.textFaint, marginTop: 2 }]}
+    <>
+      <Tabs
+        screenOptions={{ headerShown: false, sceneStyle: { backgroundColor: theme.bg } }}
+        tabBar={({ state, navigation }) => (
+          <View style={[styles.wrap, { paddingBottom: Math.max(insets.bottom, space.md) }]}>
+            <View style={[styles.pill, { backgroundColor: theme.bgElevated, borderColor: theme.border }]}>
+              {TABS.map((tab, i) => {
+                const focused = state.index === i
+                return (
+                  <Pressable
+                    key={tab.name}
+                    accessibilityRole="tab"
+                    accessibilityState={{ selected: focused }}
+                    accessibilityLabel={tab.label}
+                    onPress={() => navigation.navigate(tab.name)}
+                    style={[styles.tab, focused && { backgroundColor: theme.bgSunken }]}
+                    hitSlop={space.sm}
                   >
-                    {tab.label}
-                  </Text>
-                </Pressable>
-              )
-            })}
+                    <Text style={{ color: focused ? theme.text : theme.textFaint, fontSize: 17 }}>
+                      {tab.glyph}
+                    </Text>
+                    <Text style={[type.micro, { color: focused ? theme.text : theme.textFaint, marginTop: 1 }]}>
+                      {tab.label}
+                    </Text>
+                  </Pressable>
+                )
+              })}
+            </View>
+
+            <Pressable
+              accessibilityRole="button"
+              accessibilityLabel="Add"
+              onPress={() => setSheetOpen(true)}
+              style={[styles.fab, { backgroundColor: theme.text }]}
+            >
+              <Text style={{ color: theme.bg, fontSize: 28, lineHeight: 30, fontWeight: '300' }}>+</Text>
+            </Pressable>
+          </View>
+        )}
+      >
+        {TABS.map((t) => (
+          <Tabs.Screen key={t.name} name={t.name} options={{ title: t.label }} />
+        ))}
+      </Tabs>
+
+      <Modal visible={sheetOpen} transparent animationType="fade" onRequestClose={() => setSheetOpen(false)}>
+        <Pressable style={styles.backdrop} onPress={() => setSheetOpen(false)}>
+          <View style={[styles.grid, { paddingBottom: Math.max(insets.bottom, space.md) + 90 }]}>
+            {ACTIONS.map((a) => (
+              <Pressable
+                key={a.label}
+                accessibilityRole="button"
+                onPress={() => {
+                  setSheetOpen(false)
+                  router.push(a.route as never)
+                }}
+                style={[styles.action, { backgroundColor: theme.bgElevated }]}
+              >
+                <Text style={{ fontSize: 26, color: theme.text }}>{a.glyph}</Text>
+                <Text style={[type.bodyStrong, { color: theme.text, marginTop: space.sm }]}>{a.label}</Text>
+              </Pressable>
+            ))}
           </View>
 
-          {/*
-            The FAB is ALWAYS present and ALWAYS opens real logging.
-            The single most consequential structural decision in this app: the
-            incumbent paywalls this button, which is the direct cause of its
-            third-most-common complaint. There is no IAP configured anywhere in
-            this project, which is what leaves App Store Guideline 3.1.1 nothing
-            to attach to.
-          */}
-          <Pressable
-            accessibilityRole="button"
-            accessibilityLabel="Log a meal"
-            onPress={() => router.push('/camera')}
-            style={[styles.fab, { backgroundColor: theme.text }]}
-          >
-            <Text style={{ color: theme.bg, fontSize: 28, lineHeight: 30, fontWeight: '300' }}>+</Text>
-          </Pressable>
-        </View>
-      )}
-    >
-      {TABS.map((t) => (
-        <Tabs.Screen key={t.name} name={t.name} options={{ title: t.label }} />
-      ))}
-    </Tabs>
+          <View style={[styles.closeWrap, { paddingBottom: Math.max(insets.bottom, space.md) }]}>
+            <View style={{ flex: 1 }} />
+            <Pressable
+              accessibilityRole="button"
+              accessibilityLabel="Close"
+              onPress={() => setSheetOpen(false)}
+              style={[styles.fab, { backgroundColor: theme.text }]}
+            >
+              <Text style={{ color: theme.bg, fontSize: 24, lineHeight: 26 }}>×</Text>
+            </Pressable>
+          </View>
+        </Pressable>
+      </Modal>
+    </>
   )
 }
 
@@ -95,7 +135,6 @@ const styles = StyleSheet.create({
     bottom: 0,
     flexDirection: 'row',
     alignItems: 'center',
-    justifyContent: 'center',
     gap: space.md,
     paddingHorizontal: space.lg,
   },
@@ -104,19 +143,42 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     borderRadius: radius.pill,
     borderWidth: StyleSheet.hairlineWidth,
-    paddingVertical: space.sm,
+    padding: space.xs,
   },
   tab: {
     flex: 1,
     alignItems: 'center',
     justifyContent: 'center',
     minHeight: MIN_TAP_TARGET,
+    borderRadius: radius.pill,
   },
   fab: {
-    width: 56,
-    height: 56,
+    width: 58,
+    height: 58,
     borderRadius: radius.pill,
     alignItems: 'center',
     justifyContent: 'center',
+  },
+  backdrop: { flex: 1, backgroundColor: 'rgba(0,0,0,0.35)', justifyContent: 'flex-end' },
+  grid: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: space.md,
+    paddingHorizontal: space.lg,
+  },
+  action: {
+    width: '47%',
+    aspectRatio: 1.35,
+    borderRadius: radius.lg,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  closeWrap: {
+    position: 'absolute',
+    left: 0,
+    right: 0,
+    bottom: 0,
+    flexDirection: 'row',
+    paddingHorizontal: space.lg,
   },
 })

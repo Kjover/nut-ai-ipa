@@ -11,13 +11,14 @@ export const FLOW = [
   'birth',
   'height',
   'weight',
-  'professional',
-  'goal',
-  // 'trend' sits AFTER 'goal' on purpose. In the reference it comes earlier and
-  // always draws a downward line, which is simply wrong for a user who picked
-  // "gain weight". A chart cannot adapt to a goal that has not been chosen yet.
-  'trend',
+  // No 'goal' screen. Direction is DERIVED from current vs desired weight — see
+  // inferredGoal(). Asking after both numbers are known can only produce
+  // agreement or a contradiction the app then has to resolve silently.
   'desired-weight',
+  // 'trend' sits after the weights so its curve can follow the real direction.
+  // The reference draws a decline unconditionally, which is wrong for a bulk.
+  'trend',
+  'professional',
   'potential',
   'blocker',
   'diet',

@@ -4,7 +4,7 @@ import { bmi, UNDERWEIGHT_BMI } from '@nutai/goals'
 import { OnboardingScreen } from '../../src/components/onboarding/Chrome'
 import { EditableValue, RulerPicker } from '../../src/components/onboarding/Controls'
 import { nextRoute, stepIndex, TOTAL_STEPS } from '../../src/onboarding/flow'
-import { kgToLb, lbToKg, setAnswer, useAnswers } from '../../src/onboarding/store'
+import { inferredGoal, kgToLb, lbToKg, MAINTAIN_THRESHOLD_LB, setAnswer, useAnswers } from '../../src/onboarding/store'
 import { useTheme } from '../../src/theme/ThemeProvider'
 import { radius, space, type } from '../../src/theme/tokens'
 
@@ -16,9 +16,9 @@ export default function DesiredWeightScreen() {
   const a = useAnswers()
 
   const currentKg = a.weightKg ?? 88.4
-  const fallback =
-    a.goal === 'lose' ? currentKg - 4.5 : a.goal === 'gain' ? currentKg + 4.5 : currentKg
-  const kg = a.desiredWeightKg ?? fallback
+  // Defaults to the CURRENT weight, i.e. "maintain", so the direction is
+  // something the user chooses by moving, not something we assumed for them.
+  const kg = a.desiredWeightKg ?? currentKg
 
   const imperial = a.units === 'imperial'
   const shown = imperial ? kgToLb(kg) : kg
@@ -32,6 +32,11 @@ export default function DesiredWeightScreen() {
   const goalBmi = a.heightCm ? bmi(kg, a.heightCm) : null
   const underweight = goalBmi != null && goalBmi < UNDERWEIGHT_BMI
 
+  // Direction is DERIVED, and updates live as the ruler moves — pass the current
+  // ruler value rather than the stored one so the label never lags a frame.
+  const goal = inferredGoal({ weightKg: currentKg, desiredWeightKg: kg })
+  const deltaLb = Math.abs(kgToLb(kg) - kgToLb(currentKg))
+
   return (
     <OnboardingScreen
       step={stepIndex('desired-weight')}
@@ -44,7 +49,7 @@ export default function DesiredWeightScreen() {
     >
       <View style={{ alignItems: 'center', marginTop: 72 }}>
         <EditableValue
-          label={a.goal ? GOAL_LABEL[a.goal] : 'Target weight'}
+          label={GOAL_LABEL[goal]}
           value={shown}
           unit={imperial ? 'lbs' : 'kg'}
           min={min}
@@ -62,6 +67,14 @@ export default function DesiredWeightScreen() {
           value={Number(shown.toFixed(1))}
           onChange={(v) => setAnswer('desiredWeightKg', imperial ? lbToKg(v) : v)}
         />
+      </View>
+
+      <View style={{ alignItems: 'center', marginTop: space.lg }}>
+        <Text style={[type.caption, { color: theme.textMuted, textAlign: 'center' }]}>
+          {goal === 'maintain'
+            ? `Within ${MAINTAIN_THRESHOLD_LB} lbs of where you are — we'll set you up to maintain.`
+            : `${deltaLb.toFixed(1)} lbs to ${goal === 'gain' ? 'gain' : 'lose'}. We work the direction out from these two numbers.`}
+        </Text>
       </View>
 
       {underweight ? (

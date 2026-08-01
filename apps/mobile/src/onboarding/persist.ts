@@ -7,6 +7,7 @@ import {
   activityFor,
   ageFrom,
   featureDefaultsFor,
+  inferredGoal,
   todayEmphasisFor,
   type OnboardingAnswers,
 } from './store'
@@ -59,7 +60,7 @@ export async function persistOnboarding(
        VALUES (?,?,?,?,?,?,?,?,?,?,?,1)`,
       [
         now,
-        answers.goal ?? 'maintain',
+        inferredGoal(answers),
         null,
         target.target,
         target.targetRaw,

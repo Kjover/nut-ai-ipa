@@ -54,6 +54,10 @@ function Root() {
         <Stack.Screen name="camera" options={{ presentation: 'modal' }} />
         <Stack.Screen name="result" options={{ presentation: 'modal' }} />
         <Stack.Screen name="log-weight" options={{ presentation: 'modal' }} />
+        <Stack.Screen name="log-exercise" options={{ presentation: 'modal' }} />
+        <Stack.Screen name="food-search" options={{ presentation: 'modal' }} />
+        <Stack.Screen name="saved-foods" options={{ presentation: 'modal' }} />
+        <Stack.Screen name="edit-goals" options={{ presentation: 'modal' }} />
       </Stack>
     </>
   )
