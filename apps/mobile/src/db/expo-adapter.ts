@@ -57,12 +57,56 @@ export async function openUserDb(): Promise<DbAdapter> {
 /**
  * The read-only bundled nutrition corpus.
  *
- * Copied out of the asset bundle to writable storage on first run, because FTS5
- * needs somewhere to put its temporary files. It is still never written by the
- * app — the copy exists for SQLite's benefit, not ours, and a corpus update
- * replaces the file wholesale rather than mutating it.
+ * The 4.7 MB artifact built by tools/nutrition-data ships as an app asset and is
+ * imported into the SQLite directory on first launch, because FTS5 needs a real
+ * writable path for its temporary files. The app never writes to it — the copy
+ * exists for SQLite's benefit, not ours, and a corpus update replaces the file
+ * wholesale rather than mutating it.
+ *
+ * WITHOUT THIS IMPORT the app opens an EMPTY database of the same name, and every
+ * food silently falls to the AI-estimate path — which looks exactly like a
+ * resolver bug while actually being a missing asset. Hence `nutritionCorpusInfo`
+ * below, so that failure is legible rather than mysterious.
  */
+let nutritionImported = false
+
 export async function openNutritionDb(): Promise<DbAdapter> {
+  if (!nutritionImported) {
+    try {
+      await SQLite.importDatabaseFromAssetAsync('nutrition.db', {
+        assetId: require('../../assets/nutrition.db'),
+        // Idempotent by name. Re-copying 4.7 MB on every cold start would be a
+        // visible delay for nothing.
+        forceOverwrite: false,
+      })
+    } catch {
+      // Already imported by a previous launch — the common path.
+    }
+    nutritionImported = true
+  }
+
   const db = await SQLite.openDatabaseAsync('nutrition.db')
   return new ExpoDbAdapter(db)
+}
+
+/**
+ * Confirm the corpus actually arrived.
+ *
+ * A build shipped without the asset answers every query with zero rows, which is
+ * indistinguishable at the UI from "no match found". Surfacing the row count
+ * turns a silent, confusing failure into an obvious one.
+ */
+export async function nutritionCorpusInfo(
+  db: DbAdapter,
+): Promise<{ foods: number; portions: number; builtAt: string | null }> {
+  try {
+    const foods = await db.get<{ c: number }>('SELECT COUNT(*) c FROM foods')
+    const portions = await db.get<{ c: number }>('SELECT COUNT(*) c FROM food_portions')
+    const built = await db.get<{ value: string }>(
+      "SELECT value FROM build_manifest WHERE key = 'built_at'",
+    )
+    return { foods: foods?.c ?? 0, portions: portions?.c ?? 0, builtAt: built?.value ?? null }
+  } catch {
+    return { foods: 0, portions: 0, builtAt: null }
+  }
 }

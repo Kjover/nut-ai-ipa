@@ -10,6 +10,11 @@ const config = getDefaultConfig(projectRoot)
 // Watch the whole workspace so edits to packages/* hot-reload in the app.
 config.watchFolders = [workspaceRoot]
 
+// The bundled nutrition corpus is a binary asset, not source. Without this Metro
+// refuses to resolve `require('../../assets/nutrition.db')` and the app ships
+// with an empty database that answers every query with zero rows.
+config.resolver.assetExts = [...config.resolver.assetExts, 'db']
+
 config.resolver.nodeModulesPaths = [
   path.resolve(projectRoot, 'node_modules'),
   path.resolve(workspaceRoot, 'node_modules'),
