@@ -1,0 +1,36 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1024 1024">
+  <!--
+    The Nut AI mark. Same grammar as the incumbent's: a white food silhouette
+    inside four scan-frame corners on near-black — except the food is ours.
+    Peanut is drawn as a pure silhouette (no shell texture): at 60px on a home
+    screen, texture reads as noise and silhouette reads as identity.
+  -->
+  <rect width="1024" height="1024" fill="#0B0B0F"/>
+
+  <!-- Scan-frame corners -->
+  <g stroke="#FFFFFF" stroke-width="52" stroke-linecap="round" fill="none">
+    <path d="M 150 385 L 150 220 Q 150 150 220 150 L 385 150"/>
+    <path d="M 639 150 L 804 150 Q 874 150 874 220 L 874 385"/>
+    <path d="M 874 639 L 874 804 Q 874 874 804 874 L 639 874"/>
+    <path d="M 385 874 L 220 874 Q 150 874 150 804 L 150 639"/>
+  </g>
+
+  <!-- The peanut. Two things separate "peanut" from "snowman" or "8" at a
+       glance: a GENTLE waist (not a deep figure-8 pinch) and a bent axis —
+       the top lobe leans right of the bottom one, like the emoji. The right
+       side carries the pinch; the left side is the smooth inner curve of the
+       bend. -->
+  <g transform="rotate(14 512 512)">
+    <path fill="#FFFFFF" d="
+      M 555 270
+      C 620 272, 670 322, 670 388
+      C 670 440, 650 474, 601 506
+      C 610 544, 622 590, 620 645
+      C 618 730, 560 790, 475 790
+      C 392 790, 330 730, 330 645
+      C 330 588, 352 545, 385 512
+      C 428 472, 436 430, 440 388
+      C 444 322, 492 268, 555 270
+      Z"/>
+  </g>
+</svg>

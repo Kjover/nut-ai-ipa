@@ -16,6 +16,10 @@ const config: ExpoConfig = {
   name: NAME,
   slug: SLUG,
   version: '0.1.0',
+  // The mark: a white peanut silhouette inside four scan-frame corners on
+  // near-black. Source of truth is assets/icon.svg; the PNGs are rendered
+  // from it (rsvg-convert), never hand-edited.
+  icon: './assets/icon.png',
   orientation: 'portrait',
   // Deep links carry widget taps and notification actions straight to a screen.
   scheme: SCHEME,
