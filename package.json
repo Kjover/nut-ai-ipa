@@ -7,7 +7,8 @@
   "workspaces": [
     "apps/*",
     "packages/*",
-    "eval"
+    "eval",
+    "tools/*"
   ],
   "engines": {
     "node": ">=20.19.0"
@@ -18,7 +19,9 @@
     "test": "vitest run",
     "test:watch": "vitest",
     "check:node-purity": "node scripts/check-node-purity.mjs",
-    "check": "npm run lint && npm run typecheck && npm run test && npm run check:node-purity"
+    "check": "npm run lint && npm run typecheck && npm run test && npm run check:node-purity && npm run data:verify",
+    "data:build": "node tools/nutrition-data/src/build.mjs",
+    "data:verify": "node tools/nutrition-data/src/golden-queries.mjs"
   },
   "devDependencies": {
     "@types/better-sqlite3": "^7.6.13",

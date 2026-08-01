@@ -167,6 +167,30 @@ describe('clamp', () => {
       expect(flags).toContainEqual(expect.objectContaining({ kind: 'impossible_energy_density' }))
     })
 
+    it('accepts real pure animal fats at USDA’s actual 902 kcal/100g', () => {
+      // Found by the golden-query gate against the real corpus: `Fat, beef
+      // tallow`, `Lard` and every fish oil in SR Legacy are listed at exactly
+      // 902, because USDA applies a food-specific 9.02 kcal/g factor to fat
+      // rather than the rounded 9. A 900 ceiling told users their lard was
+      // physically impossible.
+      const { flags } = clamp(
+        payload([item({ name: 'Lard', model_gram_estimate: 100, fallback_macros_at_estimate: {
+          calories_kcal: 902, protein_g: 0, carbs_g: 0, fat_g: 100, fiber_g: 0, sodium_mg: 0,
+        } })]),
+      )
+      expect(flags.filter((f) => f.kind === 'impossible_energy_density')).toEqual([])
+    })
+
+    it('still catches kJ reported as kcal, which is the failure it exists for', () => {
+      // 100 g of chicken at 4.2x its real value — the classic unit confusion.
+      const { flags } = clamp(
+        payload([item({ model_gram_estimate: 100, fallback_macros_at_estimate: {
+          calories_kcal: 4200, protein_g: 250, carbs_g: 0, fat_g: 200, fiber_g: 0, sodium_mg: 0,
+        } })]),
+      )
+      expect(flags.some((f) => f.kind === 'impossible_energy_density')).toBe(true)
+    })
+
     it('does not flag olive oil, which is legitimately near the ceiling', () => {
       // 14 g olive oil, 124 kcal -> ~884 kcal/100 g. Real food, must pass.
       const { flags } = clamp(

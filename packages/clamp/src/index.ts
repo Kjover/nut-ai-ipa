@@ -28,8 +28,24 @@ export const CLAMP_BOUNDS = {
   MEAL_KCAL: [0, 5000],
   ITEM_KCAL: [0, 3000],
   ITEM_GRAMS: [0.1, 3000],
-  /** Pure fat is ~884 kcal/100 g. Nothing edible exceeds this. */
-  MAX_KCAL_PER_100G: 900,
+  /**
+   * Energy-density ceiling, in kcal per 100 g.
+   *
+   * The spec said 900, on the reasoning that "pure fat is ~884". REAL USDA DATA
+   * DISAGREES: `Fat, beef tallow`, `Lard`, and every fish oil in SR Legacy are
+   * listed at exactly **902 kcal/100 g**, because USDA applies a food-specific
+   * Atwater factor of 9.02 kcal/g to fat rather than the rounded 9.
+   *
+   * At 900 this check false-positives on ordinary cooking fats — someone logging
+   * a spoon of lard would be told their food is physically impossible. Raised to
+   * 920, which clears the real 902 maximum with headroom while still catching the
+   * failure classes this exists for: kJ reported as kcal (~4.2x), decimal slips,
+   * and per-100g values reported as absolute.
+   *
+   * Found by the golden-query gate running against the actual corpus, which is
+   * the entire argument for having that gate.
+   */
+  MAX_KCAL_PER_100G: 920,
   /** Atwater 4/4/9 may disagree with a stated calorie count by up to this fraction. */
   MACRO_ARITHMETIC_TOLERANCE: 0.15,
 } as const

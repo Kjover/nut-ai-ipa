@@ -1,0 +1,12 @@
+{
+  "name": "@nutai/nutrition-data",
+  "version": "0.0.0",
+  "private": true,
+  "license": "ODbL-1.0",
+  "type": "module",
+  "description": "Builds the bundled nutrition.db artifact. Separately licensed from the app.",
+  "scripts": {
+    "build": "node src/build.mjs",
+    "verify": "node src/golden-queries.mjs"
+  }
+}

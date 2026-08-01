@@ -41,3 +41,6 @@ eval/.promptfoo/
 
 .DS_Store
 *.log
+
+# Raw USDA source CSVs — re-downloadable, ~90MB unpacked.
+tools/nutrition-data/data/
