@@ -14,7 +14,7 @@
   },
   "scripts": {
     "lint": "eslint . --max-warnings=0",
-    "typecheck": "tsc -p tsconfig.json",
+    "typecheck": "tsc -p tsconfig.json && npm --prefix apps/mobile run typecheck",
     "test": "vitest run",
     "test:watch": "vitest",
     "check:node-purity": "node scripts/check-node-purity.mjs",
