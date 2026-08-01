@@ -1,10 +1,11 @@
 import * as Haptics from 'expo-haptics'
-import { useCallback, useMemo, useRef } from 'react'
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import {
   Pressable,
   ScrollView,
   StyleSheet,
   Text,
+  TextInput,
   View,
   type NativeScrollEvent,
   type NativeSyntheticEvent,
@@ -122,9 +123,19 @@ const TICK_SPACING = 12
 /**
  * Horizontal ruler picker, used for both weight screens.
  *
- * A scroll position IS the value — there is no separate slider thumb to drift out
- * of sync. Ticks are drawn every `step`, with a taller tick every tenth, and the
- * fixed centre line is the read-out point.
+ * The scroll position IS the value — there is no separate thumb to drift out of
+ * sync with the number above it.
+ *
+ * THE THING THAT MAKES THIS FEEL RESPONSIVE, and which is easy to get wrong:
+ * `contentOffset` is NOT passed as a controlled prop. Doing that creates a fight —
+ * every scroll frame updates state, the re-render reasserts the old offset, and
+ * the gesture stutters or refuses to start. The initial position is set once
+ * imperatively, and afterwards the scroll view owns its own offset. State flows
+ * out of the gesture, never back into it.
+ *
+ * The one exception is a genuinely EXTERNAL change, such as typing a number or
+ * switching units. `lastEmitted` distinguishes "this value came from my own
+ * scroll" (ignore) from "something else set this" (scroll to it).
  */
 export function RulerPicker({
   min,
@@ -142,37 +153,63 @@ export function RulerPicker({
   width: number
 }) {
   const theme = useTheme()
-  const lastHaptic = useRef(value)
+  const scrollRef = useRef<ScrollView>(null)
+  const lastEmitted = useRef<number | null>(null)
+  const lastHaptic = useRef(Math.round(value))
+  const didInit = useRef(false)
 
   const count = Math.round((max - min) / step) + 1
   const ticks = useMemo(() => Array.from({ length: count }, (_, i) => i), [count])
   const sidePad = width / 2
 
+  const offsetFor = useCallback((v: number) => ((v - min) / step) * TICK_SPACING, [min, step])
+
+  // Initial position, once, without animation.
+  const onLayout = useCallback(() => {
+    if (didInit.current) return
+    didInit.current = true
+    scrollRef.current?.scrollTo({ x: offsetFor(value), animated: false })
+  }, [offsetFor, value])
+
+  // External changes only — typing a value, or a unit switch that rescales.
+  useEffect(() => {
+    if (!didInit.current) return
+    if (lastEmitted.current != null && Math.abs(lastEmitted.current - value) < step / 2) return
+    scrollRef.current?.scrollTo({ x: offsetFor(value), animated: false })
+  }, [value, offsetFor, step])
+
   const onScroll = useCallback(
     (e: NativeSyntheticEvent<NativeScrollEvent>) => {
       const x = e.nativeEvent.contentOffset.x
       const index = Math.round(x / TICK_SPACING)
-      const next = Math.min(max, Math.max(min, min + index * step))
-      if (next !== value) onChange(next)
+      const raw = min + index * step
+      const next = Math.min(max, Math.max(min, Math.round(raw / step) * step))
+      if (lastEmitted.current != null && Math.abs(lastEmitted.current - next) < step / 2) return
+      lastEmitted.current = next
+      onChange(next)
       // One tick of feedback per whole unit, not per pixel.
-      if (Math.abs(next - lastHaptic.current) >= 1) {
-        lastHaptic.current = next
+      const whole = Math.round(next)
+      if (whole !== lastHaptic.current) {
+        lastHaptic.current = whole
         void Haptics.selectionAsync()
       }
     },
-    [max, min, onChange, step, value],
+    [max, min, onChange, step],
   )
 
   return (
-    <View style={{ height: 150 }}>
+    <View style={{ height: 150 }} onLayout={onLayout}>
       <ScrollView
+        ref={scrollRef}
         horizontal
         showsHorizontalScrollIndicator={false}
         snapToInterval={TICK_SPACING}
+        disableIntervalMomentum
         decelerationRate="fast"
         onScroll={onScroll}
+        // 16ms is one frame. The default (0) fires only at the start and end,
+        // which is what makes a ruler feel dead while you drag it.
         scrollEventThrottle={16}
-        contentOffset={{ x: ((value - min) / step) * TICK_SPACING, y: 0 }}
         contentContainerStyle={{ paddingHorizontal: sidePad }}
         style={{ height: 110 }}
       >
@@ -211,6 +248,93 @@ export function RulerPicker({
   )
 }
 
+/**
+ * The big read-out above a picker, tappable to type an exact value.
+ *
+ * Scrolling to 187.3 lbs on a ruler is genuinely tedious when you already know
+ * the number off a scale. Tapping the value swaps in a numeric field; committing
+ * clamps to range and scrolls the ruler to match, so the two never disagree.
+ */
+export function EditableValue({
+  value,
+  unit,
+  min,
+  max,
+  onCommit,
+  label,
+}: {
+  value: number
+  unit: string
+  min: number
+  max: number
+  onCommit: (v: number) => void
+  label?: string
+}) {
+  const theme = useTheme()
+  const [editing, setEditing] = useState(false)
+  const [draft, setDraft] = useState('')
+
+  const commit = () => {
+    const parsed = Number.parseFloat(draft.replace(',', '.'))
+    if (Number.isFinite(parsed)) {
+      // Clamp rather than reject. Someone typing 900 lbs has made a typo, and
+      // silently discarding their input teaches them the field is broken.
+      onCommit(Math.min(max, Math.max(min, parsed)))
+    }
+    setEditing(false)
+  }
+
+  return (
+    <View style={{ alignItems: 'center' }}>
+      {label ? <Text style={[type.body, { color: theme.textMuted }]}>{label}</Text> : null}
+
+      {editing ? (
+        <View style={styles.editRow}>
+          <TextInput
+            autoFocus
+            selectTextOnFocus
+            keyboardType="decimal-pad"
+            returnKeyType="done"
+            value={draft}
+            onChangeText={setDraft}
+            onSubmitEditing={commit}
+            onBlur={commit}
+            accessibilityLabel={`${label ?? 'Value'} in ${unit}`}
+            style={[
+              styles.editInput,
+              { color: theme.text, borderBottomColor: theme.text },
+            ]}
+          />
+          <Text style={[styles.readoutUnit, { color: theme.text }]}> {unit}</Text>
+        </View>
+      ) : (
+        <Pressable
+          accessibilityRole="button"
+          accessibilityLabel={`${value.toFixed(1)} ${unit}. Tap to type an exact value.`}
+          hitSlop={space.md}
+          onPress={() => {
+            void Haptics.selectionAsync()
+            setDraft(value.toFixed(1))
+            setEditing(true)
+          }}
+          style={styles.editRow}
+        >
+          <Text style={[styles.readoutValue, { color: theme.text }]}>
+            {value.toFixed(1)} {unit}
+          </Text>
+          <Text style={[type.caption, { color: theme.textFaint, marginLeft: space.sm }]}>✎</Text>
+        </Pressable>
+      )}
+
+      {!editing ? (
+        <Text style={[type.caption, { color: theme.textFaint, marginTop: space.xs }]}>
+          Tap to type
+        </Text>
+      ) : null}
+    </View>
+  )
+}
+
 // ---------------------------------------------------------------------------
 
 const ROW_HEIGHT = 46
@@ -230,21 +354,45 @@ export function Wheel({
   label: string
 }) {
   const theme = useTheme()
+  const scrollRef = useRef<ScrollView>(null)
+  const lastEmitted = useRef<number | null>(null)
+  const didInit = useRef(false)
+
   const index = Math.max(0, items.findIndex((i) => i.value === value))
+
+  // Same rule as the ruler: set the offset once, then let the scroll view own it.
+  // A controlled `contentOffset` reasserts the old position on every scroll frame,
+  // which is what makes a wheel feel sticky or refuse to move at all.
+  const onLayout = useCallback(() => {
+    if (didInit.current) return
+    didInit.current = true
+    scrollRef.current?.scrollTo({ y: index * ROW_HEIGHT, animated: false })
+  }, [index])
+
+  // External changes only — e.g. the day wheel being clamped when the month
+  // changes from March to February.
+  useEffect(() => {
+    if (!didInit.current) return
+    if (lastEmitted.current === value) return
+    scrollRef.current?.scrollTo({ y: index * ROW_HEIGHT, animated: false })
+  }, [index, value])
 
   return (
     <ScrollView
+      ref={scrollRef}
+      onLayout={onLayout}
       accessibilityLabel={label}
       showsVerticalScrollIndicator={false}
       snapToInterval={ROW_HEIGHT}
+      disableIntervalMomentum
       decelerationRate="fast"
       scrollEventThrottle={16}
-      contentOffset={{ x: 0, y: index * ROW_HEIGHT }}
       contentContainerStyle={{ paddingVertical: ROW_HEIGHT * 2 }}
       onScroll={(e) => {
         const i = Math.round(e.nativeEvent.contentOffset.y / ROW_HEIGHT)
         const next = items[Math.min(items.length - 1, Math.max(0, i))]
         if (next && next.value !== value) {
+          lastEmitted.current = next.value
           void Haptics.selectionAsync()
           onChange(next.value)
         }
@@ -337,6 +485,18 @@ const styles = StyleSheet.create({
     shadowRadius: 6,
     shadowOffset: { width: 0, height: 2 },
     elevation: 2,
+  },
+  editRow: { flexDirection: 'row', alignItems: 'baseline', marginTop: space.xs },
+  readoutValue: { fontSize: 44, fontWeight: '800', letterSpacing: -1.2 },
+  readoutUnit: { fontSize: 44, fontWeight: '800', letterSpacing: -1.2 },
+  editInput: {
+    fontSize: 44,
+    fontWeight: '800',
+    letterSpacing: -1.2,
+    minWidth: 130,
+    textAlign: 'right',
+    borderBottomWidth: 2,
+    paddingBottom: 2,
   },
   rulerRow: { flexDirection: 'row', alignItems: 'flex-start', height: 76 },
   rulerCursor: { position: 'absolute', top: 0, alignItems: 'center' },

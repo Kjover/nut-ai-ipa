@@ -1,22 +1,22 @@
 import { router } from 'expo-router'
-import { StyleSheet, Text, useWindowDimensions, View } from 'react-native'
+import { StyleSheet, useWindowDimensions, View } from 'react-native'
 import { OnboardingScreen } from '../../src/components/onboarding/Chrome'
-import { RulerPicker, Segmented } from '../../src/components/onboarding/Controls'
+import { EditableValue, RulerPicker, Segmented } from '../../src/components/onboarding/Controls'
 import { nextRoute, stepIndex, TOTAL_STEPS } from '../../src/onboarding/flow'
 import { kgToLb, lbToKg, setAnswer, useAnswers } from '../../src/onboarding/store'
-import { useTheme } from '../../src/theme/ThemeProvider'
-import { space, type } from '../../src/theme/tokens'
+import { space } from '../../src/theme/tokens'
 
 const DEFAULT_KG = 88.4 // ~194.9 lbs, matching the reference default
 
 export default function WeightScreen() {
-  const theme = useTheme()
   const { width } = useWindowDimensions()
   const a = useAnswers()
 
   const kg = a.weightKg ?? DEFAULT_KG
   const imperial = a.units === 'imperial'
   const shown = imperial ? kgToLb(kg) : kg
+  const min = imperial ? 60 : 30
+  const max = imperial ? 500 : 227
 
   return (
     <OnboardingScreen
@@ -43,18 +43,22 @@ export default function WeightScreen() {
         />
 
         <View style={styles.readout}>
-          <Text style={[type.body, { color: theme.textMuted }]}>Current weight</Text>
-          <Text style={[styles.value, { color: theme.text }]}>
-            {shown.toFixed(1)} {imperial ? 'lbs' : 'kg'}
-          </Text>
+          <EditableValue
+            label="Current weight"
+            value={shown}
+            unit={imperial ? 'lbs' : 'kg'}
+            min={min}
+            max={max}
+            onCommit={(v) => setAnswer('weightKg', imperial ? lbToKg(v) : v)}
+          />
         </View>
       </View>
 
       <View style={{ marginTop: space.lg, marginHorizontal: -space.lg }}>
         <RulerPicker
           width={width}
-          min={imperial ? 60 : 30}
-          max={imperial ? 500 : 227}
+          min={min}
+          max={max}
           step={0.1}
           value={Number(shown.toFixed(1))}
           onChange={(v) => setAnswer('weightKg', imperial ? lbToKg(v) : v)}
@@ -66,5 +70,4 @@ export default function WeightScreen() {
 
 const styles = StyleSheet.create({
   readout: { alignItems: 'center', marginTop: 96 },
-  value: { fontSize: 44, fontWeight: '800', letterSpacing: -1.2, marginTop: space.xs },
 })

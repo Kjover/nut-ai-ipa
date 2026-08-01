@@ -2,7 +2,7 @@ import { router } from 'expo-router'
 import { StyleSheet, Text, useWindowDimensions, View } from 'react-native'
 import { bmi, UNDERWEIGHT_BMI } from '@nutai/goals'
 import { OnboardingScreen } from '../../src/components/onboarding/Chrome'
-import { RulerPicker } from '../../src/components/onboarding/Controls'
+import { EditableValue, RulerPicker } from '../../src/components/onboarding/Controls'
 import { nextRoute, stepIndex, TOTAL_STEPS } from '../../src/onboarding/flow'
 import { kgToLb, lbToKg, setAnswer, useAnswers } from '../../src/onboarding/store'
 import { useTheme } from '../../src/theme/ThemeProvider'
@@ -22,6 +22,8 @@ export default function DesiredWeightScreen() {
 
   const imperial = a.units === 'imperial'
   const shown = imperial ? kgToLb(kg) : kg
+  const min = imperial ? 60 : 30
+  const max = imperial ? 500 : 227
 
   // The non-blocking underweight note. It appears HERE, at goal-weight entry,
   // rather than after the plan is generated — telling someone their target is
@@ -41,19 +43,21 @@ export default function DesiredWeightScreen() {
       }}
     >
       <View style={{ alignItems: 'center', marginTop: 72 }}>
-        <Text style={[type.body, { color: theme.textMuted }]}>
-          {a.goal ? GOAL_LABEL[a.goal] : 'Target weight'}
-        </Text>
-        <Text style={[styles.value, { color: theme.text }]}>
-          {shown.toFixed(1)} {imperial ? 'lbs' : 'kg'}
-        </Text>
+        <EditableValue
+          label={a.goal ? GOAL_LABEL[a.goal] : 'Target weight'}
+          value={shown}
+          unit={imperial ? 'lbs' : 'kg'}
+          min={min}
+          max={max}
+          onCommit={(v) => setAnswer('desiredWeightKg', imperial ? lbToKg(v) : v)}
+        />
       </View>
 
       <View style={{ marginTop: space.lg, marginHorizontal: -space.lg }}>
         <RulerPicker
           width={width}
-          min={imperial ? 60 : 30}
-          max={imperial ? 500 : 227}
+          min={min}
+          max={max}
           step={0.1}
           value={Number(shown.toFixed(1))}
           onChange={(v) => setAnswer('desiredWeightKg', imperial ? lbToKg(v) : v)}
@@ -73,6 +77,5 @@ export default function DesiredWeightScreen() {
 }
 
 const styles = StyleSheet.create({
-  value: { fontSize: 44, fontWeight: '800', letterSpacing: -1.2, marginTop: space.sm },
   note: { marginTop: space.xl, padding: space.lg, borderRadius: radius.lg },
 })
