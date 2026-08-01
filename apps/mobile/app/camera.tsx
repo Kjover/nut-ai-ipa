@@ -1,9 +1,9 @@
 import { CameraView, useCameraPermissions } from 'expo-camera'
-import * as ImageManipulator from 'expo-image-manipulator'
 import { router } from 'expo-router'
 import { useRef, useState } from 'react'
 import { Pressable, StyleSheet, Text, View } from 'react-native'
 import { useSafeAreaInsets } from 'react-native-safe-area-context'
+import { startScan } from '../src/scan/orchestrator'
 import { setPhase } from '../src/scan/store'
 import { useTheme } from '../src/theme/ThemeProvider'
 import { MIN_TAP_TARGET, radius, space, type } from '../src/theme/tokens'
@@ -18,12 +18,10 @@ import { MIN_TAP_TARGET, radius, space, type } from '../src/theme/tokens'
  * fails because the network is down loses the user's meal, and losing a meal is
  * unrecoverable in a way that a wrong number never is.
  *
- * Preprocessing is ONE pass and every step is load-bearing:
- *   - Bake EXIF orientation into the pixels. Non-negotiable: the models read no
- *     metadata, so a sideways photo is analyzed sideways.
- *   - Resize the long edge to ~1024-1100px. Skipping this produces a ~10.6MB
- *     base64 string and real OOM risk on low-end Android. This is not polish.
- *   - JPEG at 0.8, then base64.
+ * Everything after the shutter — preprocessing, the model call, the pipeline —
+ * lives in src/scan/orchestrator.ts and runs behind the result screen's
+ * progress states. This screen's whole job is to hand off and get out of the
+ * way fast.
  */
 export default function Camera() {
   const theme = useTheme()
@@ -66,13 +64,11 @@ export default function Camera() {
       // The draft exists from this moment. Everything after can fail safely.
       setPhase({ kind: 'captured', photoUri: shot.uri })
 
-      const ctx = ImageManipulator.ImageManipulator.manipulate(shot.uri)
-      // Resize BEFORE encoding — the order is what bounds memory, not the format.
-      ctx.resize({ width: 1024 })
-      const image = await ctx.renderAsync()
-      await image.saveAsync({ compress: 0.8, format: ImageManipulator.SaveFormat.JPEG, base64: true })
-
+      // Navigate NOW. Preprocessing, the model call and the pipeline all run
+      // behind the result screen's progress states — the user never stares at
+      // a frozen viewfinder wondering whether the shutter worked.
       router.replace('/result')
+      void startScan(shot.uri)
     } finally {
       setBusy(false)
     }

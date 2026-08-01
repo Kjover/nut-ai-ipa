@@ -2,6 +2,7 @@ import {
   buildAnthropicRequest,
   buildGeminiRequest,
   buildOpenAIRequest,
+  buildWebLookupRequest,
   computeScanCost,
   type ProviderId,
 } from '@nutai/prompt'
@@ -206,38 +207,101 @@ export async function runScan(req: ScanRequest, fetchImpl: typeof fetch = fetch)
 }
 
 /**
- * Key validation probe.
+ * The scan with a structural safety net.
  *
- * A minimal NON-BILLING request at key-entry time that confirms three things at
- * once: the credential authenticates, the account can reach the endpoint, and the
- * chosen model id exists for that account. Returns one of the six named states
- * rather than a generic failure, so the UI can say what to actually do.
- *
- * Anthropic gets special handling: a `claude setup-token` may authenticate and
- * still lack scope for /v1/messages, so both credential shapes are worth probing
- * and the result reports which one worked.
+ * A provider that rejects our schema DIALECT (a structural 400, before auth or
+ * billing) should not brick scanning: the same request is retried once with no
+ * structured-output mode at all, relying on the prompt plus client-side Zod.
+ * That retry costs nothing extra — a structurally rejected request is never
+ * billed. Auth failures (401/403) and everything else pass through untouched.
  */
-export async function validateKey(
+export async function runScanWithFallback(
+  req: ScanRequest,
+  fetchImpl: typeof fetch = fetch,
+): Promise<ScanOutcome & { usedSchemaFallback?: boolean }> {
+  const first = await runScan(req, fetchImpl)
+  const structural =
+    !first.ok && first.error.httpStatus === 400 && req.jsonSchema != null
+  if (!structural) return first
+
+  const second = await runScan({ ...req, jsonSchema: null }, fetchImpl)
+  return second.ok ? { ...second, usedSchemaFallback: true } : first
+}
+
+/**
+ * The web-lookup refinement call — the provider's server-side search tool.
+ *
+ * No structured-output mode here (it does not compose with search on every
+ * provider), so the JSON is fished out of prose defensively: last text block,
+ * markdown fences stripped, outermost braces isolated. The caller validates
+ * with WebLookupResultZ — this function only transports.
+ */
+export interface WebLookupOutcome {
+  ok: boolean
+  raw?: unknown
+  error?: ScanFailure
+}
+
+export async function runWebLookup(
   provider: ProviderId,
-  model: string,
+  input: { model: string; itemName: string; brand: string | null; visualContext?: string | null },
   credential: Credential,
   fetchImpl: typeof fetch = fetch,
-): Promise<{ ok: true } | { ok: false; error: ScanFailure }> {
-  const probe = await runScan(
-    {
-      provider,
-      model,
-      credential,
-      imagesBase64: [],
-      localSignalsBlock: '',
-      jsonSchema: { type: 'object' },
-      timeoutMs: 15_000,
-    },
-    fetchImpl,
-  )
-  if (probe.ok) return { ok: true }
-  // A schema violation on a probe still proves the credential and model work,
-  // which is the only thing the probe is asking.
-  if (probe.error.kind === 'schema-violation') return { ok: true }
-  return { ok: false, error: probe.error }
+  timeoutMs = 30_000,
+): Promise<WebLookupOutcome> {
+  const built = buildWebLookupRequest(provider, input, credential)
+  const controller = new AbortController()
+  const timer = setTimeout(() => controller.abort(), timeoutMs)
+  try {
+    const res = await fetchImpl(built.url, {
+      method: 'POST',
+      headers: built.headers,
+      body: JSON.stringify(built.body),
+      signal: controller.signal,
+    })
+    const text = await res.text()
+    if (!res.ok) return { ok: false, error: classify(res.status, text) }
+
+    let j: Record<string, any>
+    try {
+      j = JSON.parse(text) as Record<string, any>
+    } catch {
+      return { ok: false, error: { kind: 'schema-violation', message: 'The provider returned malformed JSON.', retryable: false } }
+    }
+    let out: string | null = null
+    if (provider === 'anthropic') {
+      // Content is a block ARRAY interleaving tool use and text; the answer is
+      // the LAST text block, not the first.
+      const texts = (j.content ?? []).filter((b: any) => b?.type === 'text')
+      out = texts.length ? texts[texts.length - 1].text : null
+    } else if (provider === 'openai') {
+      // Responses API: output[] items; the message item holds output_text parts.
+      const msg = (j.output ?? []).find((o: any) => o?.type === 'message')
+      out = msg?.content?.map((c: any) => c?.text ?? '').join('') ?? j.output_text ?? null
+    } else {
+      out = (j.candidates?.[0]?.content?.parts ?? []).map((p: any) => p?.text ?? '').join('') || null
+    }
+    if (!out) {
+      return { ok: false, error: { kind: 'schema-violation', message: 'The provider returned no text.', retryable: false } }
+    }
+
+    const fenced = out.replace(/```(?:json)?/g, '').trim()
+    const start = fenced.indexOf('{')
+    const end = fenced.lastIndexOf('}')
+    if (start < 0 || end <= start) {
+      return { ok: false, error: { kind: 'schema-violation', message: 'No JSON in the response.', retryable: false } }
+    }
+    try {
+      return { ok: true, raw: JSON.parse(fenced.slice(start, end + 1)) }
+    } catch {
+      return { ok: false, error: { kind: 'schema-violation', message: 'The response JSON did not parse.', retryable: false } }
+    }
+  } catch (err) {
+    if ((err as Error)?.name === 'AbortError') {
+      return { ok: false, error: { kind: 'timeout-ambiguous', message: 'The lookup timed out.', retryable: false } }
+    }
+    return { ok: false, error: { kind: 'offline', message: 'No connection to the provider.', retryable: true } }
+  } finally {
+    clearTimeout(timer)
+  }
 }

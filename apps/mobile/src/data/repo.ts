@@ -243,6 +243,111 @@ export async function dayTotals(date: string): Promise<DayTotals> {
 }
 
 // ---------------------------------------------------------------------------
+// Meals
+// ---------------------------------------------------------------------------
+
+/** Local hour → slot. Deterministic, editable later; never inferred by a model. */
+function slotFor(ms: number): string {
+  const h = new Date(ms).getHours()
+  if (h < 11) return 'breakfast'
+  if (h < 16) return 'lunch'
+  if (h < 21) return 'dinner'
+  return 'snack'
+}
+
+/**
+ * Persist a reviewed scan. One transaction: the meal row, every ingredient with
+ * its per-100 g snapshot copied in (never re-looked-up live), and the cost
+ * ledger entry with REAL token counts. analysis_status lands as 'complete',
+ * which is what dayTotals reads — logging is what makes the Today ring move.
+ */
+export async function logMeal(
+  result: import('@nutai/pipeline').ScanResult,
+  meta: {
+    provider: string
+    model: string
+    inputTokens: number
+    outputTokens: number
+    costUsd: number
+  } | null,
+  photoUri: string | null,
+  now: number,
+): Promise<number> {
+  const h = await db()
+  const date = localDate(now)
+
+  return h.transaction(async (tx) => {
+    const meal = await tx.run(
+      `INSERT INTO meals (logged_at, local_date, meal_slot, photo_uri, portion_eaten_fraction,
+                          analysis_status, engine_id, prompt_version, schema_version,
+                          clamp_flags_json, created_at)
+       VALUES (?,?,?,?,?,'complete',?,?,?,?,?)`,
+      [
+        now,
+        date,
+        slotFor(now),
+        photoUri,
+        result.meal.portionEatenFraction,
+        result.meal.engineId,
+        result.meal.promptVersion,
+        result.meal.schemaVersion,
+        JSON.stringify(result.clampFlags ?? []),
+        now,
+      ],
+    )
+    const mealId = Number(meal.lastInsertRowId)
+
+    let sort = 0
+    for (const row of result.meal.ingredients) {
+      const foodId = row.sourceFoodId == null ? null : Number(row.sourceFoodId)
+      await tx.run(
+        `INSERT INTO log_items (meal_id, matched_food_id, matched_food_source, raw_model_label,
+                                display_name, grams, gram_pathway, portion_source,
+                                snap_energy_kcal, snap_protein_g, snap_fat_g, snap_carb_g,
+                                snap_fiber_g, snap_sugar_g, snap_sodium_mg,
+                                is_estimate, macros_user_edited, band_half_pct,
+                                assumptions_json, sort_order, logged_at)
+         VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)`,
+        [
+          mealId,
+          Number.isFinite(foodId as number) ? foodId : null,
+          row.origin === 'web_lookup' ? 'web' : row.sourceFoodId != null ? 'corpus' : 'estimate',
+          row.sourceUrl ?? null,
+          row.displayName,
+          row.grams,
+          row.gramPathway,
+          row.origin,
+          row.nutrientSnapshot.kcal,
+          row.nutrientSnapshot.protein_g,
+          row.nutrientSnapshot.fat_g,
+          row.nutrientSnapshot.carbs_g,
+          row.nutrientSnapshot.fiber_g ?? null,
+          row.nutrientSnapshot.sugar_g ?? null,
+          row.nutrientSnapshot.sodium_mg ?? null,
+          row.isEstimate ? 1 : 0,
+          row.macrosUserEdited ? 1 : 0,
+          row.bandHalfPct,
+          JSON.stringify(row.assumptions ?? []),
+          sort++,
+          now,
+        ],
+      )
+    }
+
+    if (meta) {
+      await tx.run(
+        `INSERT INTO scan_cost_ledger (meal_id, provider, model, input_tokens, output_tokens,
+                                       cost_usd, local_month, created_at)
+         VALUES (?,?,?,?,?,?,?,?)`,
+        [mealId, meta.provider, meta.model, meta.inputTokens, meta.outputTokens, meta.costUsd, date.slice(0, 7), now],
+      )
+    }
+
+    return mealId
+  })
+}
+
+// ---------------------------------------------------------------------------
 // Weight
 // ---------------------------------------------------------------------------
 

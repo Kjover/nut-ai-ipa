@@ -5,6 +5,7 @@ import { ActivityIndicator, Linking, Pressable, StyleSheet, Text, TextInput, Vie
 import { cheapestModel, type ProviderId } from '@nutai/prompt'
 import { OnboardingScreen } from '../../src/components/onboarding/Chrome'
 import { Icon } from '../../src/components/Icon'
+import { putSetting } from '../../src/data/repo'
 import { validateCredential } from '../../src/inference/pathA/validate'
 import { looksPlausible, saveCredential, type CredentialKind } from '../../src/inference/credentials'
 import { nextRoute, stepIndex, TOTAL_STEPS } from '../../src/onboarding/flow'
@@ -82,6 +83,10 @@ export default function ApiKeyScreen() {
     // mistake here, and correcting it silently beats failing on it.
     const acceptedKind = res.usedShape === 'bearer' ? 'oauth' : 'api_key'
     await saveCredential(provider, { kind: acceptedKind, value: value.trim() })
+    // Durable, not just in the onboarding store — the scan flow reads these on
+    // every launch, long after onboarding memory is gone.
+    await putSetting('provider', provider)
+    await putSetting('provider_model', model.id)
     setAnswer('providerModel', model.id)
     setShape(res.usedShape)
     setOk(true)
@@ -99,6 +104,7 @@ export default function ApiKeyScreen() {
       secondaryLabel={ok ? undefined : 'Skip for now'}
       onSecondary={() => {
         setAnswer('provider', 'none')
+        void putSetting('provider', 'none')
         router.push(nextRoute('apikey') as never)
       }}
       scroll

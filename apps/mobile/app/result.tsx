@@ -1,9 +1,30 @@
 import { router } from 'expo-router'
 import { useState } from 'react'
-import { Pressable, ScrollView, StyleSheet, Text, TextInput, View } from 'react-native'
+import {
+  ActivityIndicator,
+  Image,
+  Pressable,
+  ScrollView,
+  StyleSheet,
+  Text,
+  TextInput,
+  View,
+} from 'react-native'
 import { useSafeAreaInsets } from 'react-native-safe-area-context'
+import type { WebLookupResult } from '@nutai/core-schema'
 import { ConfidenceChip, ConfidenceReasons } from '../src/components/ConfidenceChip'
-import { answerQuestion, editGrams, removeRow, reset, useScan } from '../src/scan/store'
+import { Icon } from '../src/components/Icon'
+import { logMeal } from '../src/data/repo'
+import { lookupOther, retryScan } from '../src/scan/orchestrator'
+import {
+  answerQuestion,
+  applyWebOption,
+  editGrams,
+  removeRow,
+  reset,
+  useScan,
+  type WebLookupState,
+} from '../src/scan/store'
 import { useTheme } from '../src/theme/ThemeProvider'
 import { MIN_TAP_TARGET, radius, space, type } from '../src/theme/tokens'
 
@@ -25,18 +46,64 @@ export default function Result() {
   const insets = useSafeAreaInsets()
   const phase = useScan()
   const [expandedBand, setExpandedBand] = useState(false)
+  const [logging, setLogging] = useState(false)
+
+  if (phase.kind === 'analyzing' || phase.kind === 'captured') {
+    const stage = phase.kind === 'analyzing' ? phase.stage : 'preparing'
+    const copy =
+      stage === 'preparing'
+        ? 'Preparing the photo…'
+        : stage === 'identifying'
+          ? 'Identifying ingredients…'
+          : 'Matching the nutrition database…'
+    return (
+      <View style={[styles.center, { backgroundColor: theme.bg }]}>
+        <Image source={{ uri: phase.photoUri }} style={styles.photo} />
+        <ActivityIndicator color={theme.textMuted} style={{ marginTop: space.xl }} />
+        <Text style={[type.heading, { color: theme.text, marginTop: space.md }]}>{copy}</Text>
+        <Text style={[type.caption, { color: theme.textMuted, marginTop: space.sm, textAlign: 'center' }]}>
+          Your photo is saved — nothing is lost if this fails.
+        </Text>
+        <Pressable onPress={() => router.back()} hitSlop={space.md} style={{ marginTop: space.xl }}>
+          <Text style={[type.body, { color: theme.textMuted }]}>Close</Text>
+        </Pressable>
+      </View>
+    )
+  }
+
+  if (phase.kind === 'failed') {
+    return (
+      <View style={[styles.center, { backgroundColor: theme.bg }]}>
+        <Image source={{ uri: phase.photoUri }} style={[styles.photo, { opacity: 0.5 }]} />
+        <Text style={[type.heading, { color: theme.text, marginTop: space.xl, textAlign: 'center' }]}>
+          Could not read this meal
+        </Text>
+        <Text style={[type.caption, { color: theme.textMuted, marginTop: space.sm, textAlign: 'center', lineHeight: 19 }]}>
+          {phase.message}
+        </Text>
+        {phase.canRetry ? (
+          <Pressable
+            onPress={() => void retryScan()}
+            style={[styles.primary, { backgroundColor: theme.text, marginTop: space.xl, paddingHorizontal: space.xl }]}
+          >
+            <Text style={[type.bodyStrong, { color: theme.bg }]}>Try again</Text>
+          </Pressable>
+        ) : null}
+        <Pressable
+          onPress={() => { reset(); router.back() }}
+          hitSlop={space.md}
+          style={{ marginTop: space.lg }}
+        >
+          <Text style={[type.body, { color: theme.textMuted }]}>Close</Text>
+        </Pressable>
+      </View>
+    )
+  }
 
   if (phase.kind !== 'ready') {
     return (
       <View style={[styles.center, { backgroundColor: theme.bg }]}>
-        <Text style={[type.heading, { color: theme.text }]}>
-          {phase.kind === 'analyzing' ? 'Reading your meal…' : 'Nothing to show yet'}
-        </Text>
-        {phase.kind === 'captured' && (
-          <Text style={[type.caption, { color: theme.textMuted, marginTop: space.sm, textAlign: 'center' }]}>
-            Your photo is saved. You can log this by hand if you would rather not wait.
-          </Text>
-        )}
+        <Text style={[type.heading, { color: theme.text }]}>Nothing to show yet</Text>
         <Pressable onPress={() => router.back()} hitSlop={space.md} style={{ marginTop: space.xl }}>
           <Text style={[type.body, { color: theme.textMuted }]}>Close</Text>
         </Pressable>
@@ -113,33 +180,42 @@ export default function Result() {
 
         {result.meal.ingredients.map((row) => {
           const item = result.items.find((i) => i.row.id === row.id)
+          const lookup = phase.webLookups[row.id]
           return (
-            <View key={row.id} style={[styles.row, { borderColor: theme.border }]}>
-              <View style={{ flex: 1 }}>
-                <Text style={[type.body, { color: theme.text }]}>{row.displayName}</Text>
-                {row.isEstimate && (
-                  <Text style={[type.micro, { color: theme.uncertain, marginTop: 2 }]}>AI ESTIMATE</Text>
-                )}
-                {item && <ConfidenceChip value={(row.nutrientSnapshot.kcal * row.grams) / 100} band={item.band} />}
+            <View key={row.id}>
+              <View style={[styles.row, { borderColor: theme.border }]}>
+                <View style={{ flex: 1 }}>
+                  <Text style={[type.body, { color: theme.text }]}>{row.displayName}</Text>
+                  {row.origin === 'web_lookup' && row.sourceUrl ? (
+                    <Text style={[type.micro, { color: theme.textMuted, marginTop: 2 }]}>
+                      From {domainOf(row.sourceUrl)}
+                    </Text>
+                  ) : row.isEstimate ? (
+                    <Text style={[type.micro, { color: theme.uncertain, marginTop: 2 }]}>AI ESTIMATE</Text>
+                  ) : null}
+                  {item && <ConfidenceChip value={(row.nutrientSnapshot.kcal * row.grams) / 100} band={item.band} />}
+                </View>
+
+                <TextInput
+                  accessibilityLabel={`Grams of ${row.displayName}`}
+                  keyboardType="numeric"
+                  defaultValue={String(Math.round(row.grams))}
+                  onChangeText={(t) => editGrams(row.id, Number(t))}
+                  style={[styles.gramInput, { color: theme.text, borderColor: theme.border }]}
+                />
+
+                <Pressable
+                  accessibilityRole="button"
+                  accessibilityLabel={`Remove ${row.displayName}`}
+                  onPress={() => removeRow(row.id)}
+                  hitSlop={space.md}
+                  style={styles.remove}
+                >
+                  <Text style={{ color: theme.textFaint, fontSize: 20 }}>×</Text>
+                </Pressable>
               </View>
 
-              <TextInput
-                accessibilityLabel={`Grams of ${row.displayName}`}
-                keyboardType="numeric"
-                defaultValue={String(Math.round(row.grams))}
-                onChangeText={(t) => editGrams(row.id, Number(t))}
-                style={[styles.gramInput, { color: theme.text, borderColor: theme.border }]}
-              />
-
-              <Pressable
-                accessibilityRole="button"
-                accessibilityLabel={`Remove ${row.displayName}`}
-                onPress={() => removeRow(row.id)}
-                hitSlop={space.md}
-                style={styles.remove}
-              >
-                <Text style={{ color: theme.textFaint, fontSize: 20 }}>×</Text>
-              </Pressable>
+              {lookup ? <WebLookupCard rowId={row.id} state={lookup} /> : null}
             </View>
           )
         })}
@@ -148,11 +224,122 @@ export default function Result() {
       <View style={[styles.actions, { paddingBottom: Math.max(insets.bottom, space.lg), backgroundColor: theme.bg, borderColor: theme.border }]}>
         <Pressable
           accessibilityRole="button"
-          onPress={() => { reset(); router.dismissAll() }}
-          style={[styles.primary, { backgroundColor: theme.text }]}
+          disabled={logging}
+          onPress={() => {
+            if (logging) return
+            setLogging(true)
+            void (async () => {
+              try {
+                await logMeal(result, phase.meta, phase.photoUri, Date.now())
+                reset()
+                router.dismissAll()
+              } catch {
+                setLogging(false)
+              }
+            })()
+          }}
+          style={[styles.primary, { backgroundColor: theme.text }, logging && { opacity: 0.6 }]}
         >
-          <Text style={[type.bodyStrong, { color: theme.bg }]}>Log it</Text>
+          <Text style={[type.bodyStrong, { color: theme.bg }]}>{logging ? 'Logging…' : 'Log it'}</Text>
         </Pressable>
+      </View>
+    </View>
+  )
+}
+
+function domainOf(url: string): string {
+  const m = url.match(/^https?:\/\/(?:www\.)?([^/]+)/i)
+  return m?.[1] ?? url
+}
+
+/**
+ * The web-lookup card under a row the corpus missed.
+ *
+ * Three states: a quiet "checking" line, a generated multiple-choice question
+ * where EVERY option already carries its published nutrition (tapping is a
+ * free local swap), and an Other row that runs one more search with whatever
+ * the user typed.
+ */
+function WebLookupCard({ rowId, state }: { rowId: string; state: WebLookupState }) {
+  const theme = useTheme()
+  const [otherOpen, setOtherOpen] = useState(false)
+  const [otherText, setOtherText] = useState('')
+
+  if (state.status === 'running') {
+    return (
+      <View style={[styles.lookupQuiet, { backgroundColor: theme.bgSunken }]}>
+        <ActivityIndicator size="small" color={theme.textFaint} />
+        <Text style={[type.caption, { color: theme.textMuted }]}>
+          Checking the web for published nutrition…
+        </Text>
+      </View>
+    )
+  }
+  if (state.status === 'failed') return null
+
+  const result: WebLookupResult = state.result
+  // A single auto-applied option needs no card — the row above already shows
+  // its source.
+  if (result.options.length <= 1 && !result.question) return null
+
+  return (
+    <View style={[styles.qCard, { borderColor: theme.uncertain, backgroundColor: theme.uncertainBg, marginTop: space.sm }]}>
+      <Text style={[type.bodyStrong, { color: theme.text }]}>
+        {result.question ?? 'Which one was it?'}
+      </Text>
+      {result.source_url ? (
+        <Text style={[type.micro, { color: theme.textMuted, marginTop: 2 }]}>
+          Menu data from {domainOf(result.source_url)}
+        </Text>
+      ) : null}
+
+      <View style={{ marginTop: space.md, gap: space.sm }}>
+        {result.options.map((opt) => (
+          <Pressable
+            key={opt.label}
+            onPress={() => applyWebOption(rowId, opt, result.source_url)}
+            style={[styles.optionRow, { borderColor: theme.uncertain, backgroundColor: theme.bg }]}
+          >
+            <View style={{ flex: 1 }}>
+              <Text style={[type.body, { color: theme.text }]}>{opt.label}</Text>
+              {opt.serving_desc ? (
+                <Text style={[type.micro, { color: theme.textMuted, marginTop: 1 }]}>{opt.serving_desc}</Text>
+              ) : null}
+            </View>
+            <Text style={[type.label, { color: theme.textMuted }]}>{Math.round(opt.calories_kcal)} kcal</Text>
+          </Pressable>
+        ))}
+
+        {otherOpen ? (
+          <View style={{ flexDirection: 'row', gap: space.sm, alignItems: 'center' }}>
+            <TextInput
+              autoFocus
+              placeholder="Type what it was"
+              placeholderTextColor={theme.textFaint}
+              value={otherText}
+              onChangeText={setOtherText}
+              onSubmitEditing={() => {
+                if (otherText.trim()) void lookupOther(rowId, otherText.trim())
+                setOtherOpen(false)
+              }}
+              returnKeyType="search"
+              style={[styles.otherInput, { color: theme.text, borderColor: theme.border, backgroundColor: theme.bg }]}
+            />
+            <Pressable
+              onPress={() => {
+                if (otherText.trim()) void lookupOther(rowId, otherText.trim())
+                setOtherOpen(false)
+              }}
+              hitSlop={space.sm}
+            >
+              <Icon name="search" size={18} color={theme.text} />
+            </Pressable>
+          </View>
+        ) : (
+          <Pressable onPress={() => setOtherOpen(true)} style={[styles.optionRow, { borderColor: theme.border, backgroundColor: theme.bg }]}>
+            <Text style={[type.body, { color: theme.textMuted }]}>Other…</Text>
+          </Pressable>
+        )}
       </View>
     </View>
   )
@@ -200,6 +387,33 @@ const styles = StyleSheet.create({
     paddingVertical: space.sm,
     paddingHorizontal: space.sm,
     borderRadius: radius.sm,
+    borderWidth: StyleSheet.hairlineWidth,
+    minHeight: MIN_TAP_TARGET,
+  },
+  photo: { width: 160, height: 160, borderRadius: radius.lg },
+  lookupQuiet: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: space.sm,
+    padding: space.md,
+    borderRadius: radius.md,
+    marginTop: space.sm,
+  },
+  optionRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: space.md,
+    paddingHorizontal: space.md,
+    paddingVertical: space.md,
+    borderRadius: radius.md,
+    borderWidth: 1,
+    minHeight: MIN_TAP_TARGET,
+  },
+  otherInput: {
+    flex: 1,
+    paddingHorizontal: space.md,
+    paddingVertical: space.sm,
+    borderRadius: radius.md,
     borderWidth: StyleSheet.hairlineWidth,
     minHeight: MIN_TAP_TARGET,
   },

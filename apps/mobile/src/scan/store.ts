@@ -1,9 +1,11 @@
 import type { Band } from '@nutai/confidence'
-import type { IngredientRow, LoggedMeal } from '@nutai/core-schema'
+import type { IngredientRow, LoggedMeal, WebLookupOption, WebLookupResult } from '@nutai/core-schema'
+import type { ProviderId } from '@nutai/prompt'
 import type { ScanResult } from '@nutai/pipeline'
 import { recomputeAfterEdit } from '@nutai/pipeline'
 import type { SelectedQuestion } from '@nutai/repair'
 import { useSyncExternalStore } from 'react'
+import type { ScanFailureKind } from '../inference/pathA/client'
 
 /**
  * The in-flight scan.
@@ -20,12 +22,46 @@ import { useSyncExternalStore } from 'react'
  * already carries its own per-100 g snapshot.
  */
 
+/** What the scan cost and where it ran — carried to the ledger at log time. */
+export interface ScanMeta {
+  provider: ProviderId
+  model: string
+  inputTokens: number
+  outputTokens: number
+  costUsd: number
+  promptVersion: string
+}
+
+/** Per-row web-search refinement state, keyed by ingredient row id. */
+export type WebLookupState =
+  | { status: 'running' }
+  | { status: 'done'; result: WebLookupResult }
+  | { status: 'failed' }
+
 export type ScanPhase =
   | { kind: 'idle' }
   | { kind: 'captured'; photoUri: string }
-  | { kind: 'analyzing'; photoUri: string }
-  | { kind: 'ready'; photoUri: string | null; result: ScanResult; bands: Band[] }
-  | { kind: 'failed'; photoUri: string; message: string; canRetry: boolean }
+  | {
+      kind: 'analyzing'
+      photoUri: string
+      /** Which stage, for honest progress copy — never a fake percentage. */
+      stage: 'preparing' | 'identifying' | 'matching'
+    }
+  | {
+      kind: 'ready'
+      photoUri: string | null
+      result: ScanResult
+      bands: Band[]
+      meta: ScanMeta | null
+      webLookups: Record<string, WebLookupState>
+    }
+  | {
+      kind: 'failed'
+      photoUri: string
+      message: string
+      canRetry: boolean
+      failureKind?: ScanFailureKind | 'no-key'
+    }
 
 let phase: ScanPhase = { kind: 'idle' }
 const listeners = new Set<() => void>()
@@ -110,6 +146,49 @@ export function answerQuestion(q: SelectedQuestion, value: string) {
   }
   // Remaining answers swap a row's snapshot against a bundled filler food. That
   // lookup belongs to the resolver and is wired at the screen level.
+}
+
+export function setWebLookup(rowId: string, state: WebLookupState) {
+  if (phase.kind !== 'ready') return
+  phase = { ...phase, webLookups: { ...phase.webLookups, [rowId]: state } }
+  emit()
+}
+
+/**
+ * Apply a web-lookup option: swap the row's snapshot for the transcribed
+ * published values. A LOCAL operation — the search already paid for every
+ * option's data, so choosing between them costs nothing.
+ */
+export function applyWebOption(rowId: string, option: WebLookupOption, sourceUrl: string | null) {
+  mutateMeal((meal) => ({
+    ...meal,
+    ingredients: meal.ingredients.map((r) => {
+      if (r.id !== rowId) return r
+      const grams = option.serving_g ?? r.grams
+      // Published values are PER SERVING; the snapshot is per 100 g.
+      const per100 = grams > 0 ? 100 / grams : 0
+      return {
+        ...r,
+        displayName: option.label,
+        grams,
+        nutrientSnapshot: {
+          kcal: option.calories_kcal * per100,
+          protein_g: option.protein_g * per100,
+          fat_g: option.fat_g * per100,
+          carbs_g: option.carbs_g * per100,
+          fiber_g: option.fiber_g == null ? null : option.fiber_g * per100,
+          sugar_g: null,
+          sodium_mg: option.sodium_mg == null ? null : option.sodium_mg * per100,
+        },
+        origin: 'web_lookup' as const,
+        sourceUrl,
+        // Label-quality numbers: rounding rules plus serving variation, far
+        // tighter than a visual estimate but never zero.
+        bandHalfPct: 0.1,
+        isEstimate: false,
+      }
+    }),
+  }))
 }
 
 export function reset() {

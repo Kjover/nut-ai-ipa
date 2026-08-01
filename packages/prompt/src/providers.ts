@@ -93,6 +93,12 @@ export interface BuildRequestInput {
   imagesBase64: readonly string[]
   /** The labeled user-context block, or empty string. */
   localSignalsBlock: string
+  /**
+   * The provider-dialect wire schema, or null to skip structured-output mode
+   * entirely and rely on the prompt + client-side Zod. Null is the retry path
+   * when a provider rejects the schema dialect with a structural 400 — a scan
+   * that degrades to prompt-shaped JSON beats a scan that fails.
+   */
   jsonSchema: unknown
   maxTokens?: number
 }
@@ -143,7 +149,9 @@ export function buildAnthropicRequest(input: BuildRequestInput, credential: { ki
       max_tokens: input.maxTokens ?? 4096,
       system: SYSTEM_PROMPT,
       messages: [{ role: 'user', content }],
-      output_config: { format: { type: 'json_schema', schema: input.jsonSchema } },
+      ...(input.jsonSchema == null
+        ? {}
+        : { output_config: { format: { type: 'json_schema', schema: input.jsonSchema } } }),
     },
     promptVersion: PROMPT_VERSION,
   }
@@ -169,10 +177,14 @@ export function buildOpenAIRequest(input: BuildRequestInput, apiKey: string): Pr
         { role: 'system', content: SYSTEM_PROMPT },
         { role: 'user', content },
       ],
-      response_format: {
-        type: 'json_schema',
-        json_schema: { name: 'VisionPayload', strict: true, schema: input.jsonSchema },
-      },
+      ...(input.jsonSchema == null
+        ? { response_format: { type: 'json_object' } }
+        : {
+            response_format: {
+              type: 'json_schema',
+              json_schema: { name: 'VisionPayload', strict: true, schema: input.jsonSchema },
+            },
+          }),
     },
     promptVersion: PROMPT_VERSION,
   }
@@ -195,7 +207,7 @@ export function buildGeminiRequest(input: BuildRequestInput, apiKey: string): Pr
       contents: [{ role: 'user', parts }],
       generationConfig: {
         responseMimeType: 'application/json',
-        responseSchema: input.jsonSchema,
+        ...(input.jsonSchema == null ? {} : { responseSchema: input.jsonSchema }),
         maxOutputTokens: input.maxTokens ?? 4096,
       },
     },

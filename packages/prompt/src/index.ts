@@ -1,3 +1,5 @@
 export * from './system-prompt.js'
 export * from './local-signals.js'
 export * from './providers.js'
+export * from './wire-transforms.js'
+export * from './web-lookup.js'

@@ -4,6 +4,7 @@ import { cheapestModel, PROVIDER_MODELS, providersByPrice, type ProviderId } fro
 import { OnboardingScreen } from '../../src/components/onboarding/Chrome'
 import { OptionCard } from '../../src/components/onboarding/Controls'
 import type { IconName } from '../../src/components/Icon'
+import { putSetting } from '../../src/data/repo'
 import { nextRoute, stepIndex, TOTAL_STEPS } from '../../src/onboarding/flow'
 import { setAnswer, useAnswers } from '../../src/onboarding/store'
 import { useTheme } from '../../src/theme/ThemeProvider'
@@ -40,9 +41,10 @@ export default function ProviderScreen() {
       title="How should Nut AI recognize your food?"
       subtitle="Bring your own API key. Your photo goes to the provider you name and nowhere else — we run no server."
       ctaDisabled={a.provider === undefined}
-      onCta={() =>
+      onCta={() => {
+        if (a.provider === 'none') void putSetting('provider', 'none')
         router.push((a.provider === 'none' ? '/onboarding/health' : nextRoute('provider')) as never)
-      }
+      }}
       scroll
     >
       <ScrollView scrollEnabled={false}>
