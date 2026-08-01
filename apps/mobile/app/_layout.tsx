@@ -53,6 +53,7 @@ function Root() {
         {/* Full-screen flows are native modals: swipe-to-dismiss on iOS. */}
         <Stack.Screen name="camera" options={{ presentation: 'modal' }} />
         <Stack.Screen name="result" options={{ presentation: 'modal' }} />
+        <Stack.Screen name="log-weight" options={{ presentation: 'modal' }} />
       </Stack>
     </>
   )
