@@ -1,4 +1,5 @@
 import * as Haptics from 'expo-haptics'
+import Svg, { Defs, Pattern, Rect } from 'react-native-svg'
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import {
   Pressable,
@@ -118,7 +119,16 @@ export function Segmented<T extends string>({
 
 // ---------------------------------------------------------------------------
 
-const TICK_SPACING = 12
+/**
+ * Pixels per WHOLE unit (1 lb or 1 kg), not per step.
+ *
+ * These are deliberately decoupled. Drawing one tick per 0.1 step across a
+ * 60-500 lb range is 4,401 ticks; the first version of this component mounted a
+ * nested View for each, i.e. ~8,800 native views on one screen, which is enough
+ * to stall the entire app for seconds. Ticks are now drawn once per unit, and
+ * 0.1 precision comes from the scroll offset rather than from tick count.
+ */
+const PX_PER_UNIT = 12
 
 /**
  * Horizontal ruler picker, used for both weight screens.
@@ -158,13 +168,12 @@ export function RulerPicker({
   const lastHaptic = useRef(Math.round(value))
   const didInit = useRef(false)
 
-  const count = Math.round((max - min) / step) + 1
-  const ticks = useMemo(() => Array.from({ length: count }, (_, i) => i), [count])
+  const units = max - min
+  const contentWidth = units * PX_PER_UNIT
   const sidePad = width / 2
 
-  const offsetFor = useCallback((v: number) => ((v - min) / step) * TICK_SPACING, [min, step])
+  const offsetFor = useCallback((v: number) => (v - min) * PX_PER_UNIT, [min])
 
-  // Initial position, once, without animation.
   const onLayout = useCallback(() => {
     if (didInit.current) return
     didInit.current = true
@@ -181,13 +190,12 @@ export function RulerPicker({
   const onScroll = useCallback(
     (e: NativeSyntheticEvent<NativeScrollEvent>) => {
       const x = e.nativeEvent.contentOffset.x
-      const index = Math.round(x / TICK_SPACING)
-      const raw = min + index * step
-      const next = Math.min(max, Math.max(min, Math.round(raw / step) * step))
+      const raw = min + x / PX_PER_UNIT
+      const snapped = Math.round(raw / step) * step
+      const next = Math.min(max, Math.max(min, Number(snapped.toFixed(2))))
       if (lastEmitted.current != null && Math.abs(lastEmitted.current - next) < step / 2) return
       lastEmitted.current = next
       onChange(next)
-      // One tick of feedback per whole unit, not per pixel.
       const whole = Math.round(next)
       if (whole !== lastHaptic.current) {
         lastHaptic.current = whole
@@ -197,47 +205,52 @@ export function RulerPicker({
     [max, min, onChange, step],
   )
 
+  const tickColor = theme.isDark ? theme.textFaint : '#1A1A1F'
+
+  // The ruler artwork depends only on range and colour, never on the value. Held
+  // in a memo so a scroll frame reconciles one cached element instead of
+  // rebuilding the SVG tree 60 times a second.
+  const ruler = useMemo(
+    () => (
+      <Svg width={contentWidth} height={76}>
+        <Defs>
+          <Pattern id="minor" x={0} y={0} width={PX_PER_UNIT} height={76} patternUnits="userSpaceOnUse">
+            <Rect x={0} y={0} width={1.5} height={28} fill={tickColor} opacity={0.45} />
+          </Pattern>
+          <Pattern id="major" x={0} y={0} width={PX_PER_UNIT * 10} height={76} patternUnits="userSpaceOnUse">
+            <Rect x={0} y={0} width={1.5} height={56} fill={tickColor} opacity={0.9} />
+          </Pattern>
+        </Defs>
+        <Rect x={0} y={0} width={contentWidth} height={76} fill="url(#minor)" />
+        <Rect x={0} y={0} width={contentWidth} height={76} fill="url(#major)" />
+      </Svg>
+    ),
+    [contentWidth, tickColor],
+  )
+
   return (
     <View style={{ height: 150 }} onLayout={onLayout}>
       <ScrollView
         ref={scrollRef}
         horizontal
         showsHorizontalScrollIndicator={false}
-        snapToInterval={TICK_SPACING}
-        disableIntervalMomentum
-        decelerationRate="fast"
+        decelerationRate="normal"
         onScroll={onScroll}
-        // 16ms is one frame. The default (0) fires only at the start and end,
-        // which is what makes a ruler feel dead while you drag it.
+        // One frame. The default (0) fires only at gesture start and end, which
+        // is its own way of making a ruler feel dead while you drag it.
         scrollEventThrottle={16}
         contentContainerStyle={{ paddingHorizontal: sidePad }}
         style={{ height: 110 }}
       >
-        <View style={styles.rulerRow}>
-          {ticks.map((i) => {
-            const major = i % 10 === 0
-            const mid = i % 5 === 0
-            return (
-              <View
-                key={i}
-                style={{
-                  width: TICK_SPACING,
-                  alignItems: 'center',
-                  justifyContent: 'flex-start',
-                }}
-              >
-                <View
-                  style={{
-                    width: 1.5,
-                    height: major ? 56 : mid ? 40 : 28,
-                    backgroundColor: theme.isDark ? theme.textFaint : '#1A1A1F',
-                    opacity: major ? 0.9 : 0.45,
-                  }}
-                />
-              </View>
-            )
-          })}
-        </View>
+        {/*
+          The whole ruler is ONE native view.
+
+          Two tiled SVG patterns — a minor tick every unit and a major tick every
+          ten — instead of a View per tick. The previous version mounted ~8,800
+          views here and stalled the app; this is a single GPU-composited node
+          regardless of range.
+        */}
+        {ruler}
       </ScrollView>
 
       {/* The fixed read-out line. The value is whatever sits under it. */}
@@ -498,7 +511,6 @@ const styles = StyleSheet.create({
     borderBottomWidth: 2,
     paddingBottom: 2,
   },
-  rulerRow: { flexDirection: 'row', alignItems: 'flex-start', height: 76 },
   rulerCursor: { position: 'absolute', top: 0, alignItems: 'center' },
   wheelBand: {
     position: 'absolute',
