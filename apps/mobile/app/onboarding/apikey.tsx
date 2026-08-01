@@ -5,7 +5,7 @@ import { ActivityIndicator, Linking, Pressable, StyleSheet, Text, TextInput, Vie
 import { cheapestModel, type ProviderId } from '@nutai/prompt'
 import { OnboardingScreen } from '../../src/components/onboarding/Chrome'
 import { Icon } from '../../src/components/Icon'
-import { validateKey } from '../../src/inference/pathA/client'
+import { validateCredential } from '../../src/inference/pathA/validate'
 import { looksPlausible, saveCredential, type CredentialKind } from '../../src/inference/credentials'
 import { nextRoute, stepIndex, TOTAL_STEPS } from '../../src/onboarding/flow'
 import { setAnswer, useAnswers } from '../../src/onboarding/store'
@@ -54,7 +54,11 @@ export default function ApiKeyScreen() {
   const [value, setValue] = useState('')
   const [busy, setBusy] = useState(false)
   const [error, setError] = useState<string | null>(null)
+  // The raw status and body. Shown on failure so a bad key is diagnosable
+  // instead of mysterious — a generic message is what made this unfixable.
+  const [detail, setDetail] = useState<string | null>(null)
   const [ok, setOk] = useState(false)
+  const [shape, setShape] = useState<string | null>(null)
 
   const model = cheapestModel(provider)
   const plausible = looksPlausible(provider, kind, value)
@@ -64,16 +68,22 @@ export default function ApiKeyScreen() {
     setBusy(true)
     setError(null)
 
-    const res = await validateKey(provider, model.id, { kind, value: value.trim() })
+    const res = await validateCredential(provider, model.id, { kind, value: value.trim() })
     setBusy(false)
 
     if (!res.ok) {
       setError(explain(res.error.kind, res.error.message))
+      setDetail(res.detail)
       return
     }
 
-    await saveCredential(provider, { kind, value: value.trim() })
+    // Store the shape the provider ACTUALLY accepted, not the tab that was
+    // selected. Pasting a CLI token into the API-key tab is the most common
+    // mistake here, and correcting it silently beats failing on it.
+    const acceptedKind = res.usedShape === 'bearer' ? 'oauth' : 'api_key'
+    await saveCredential(provider, { kind: acceptedKind, value: value.trim() })
     setAnswer('providerModel', model.id)
+    setShape(res.usedShape)
     setOk(true)
   }
 
@@ -162,6 +172,7 @@ export default function ApiKeyScreen() {
         onChangeText={(t) => {
           setValue(t)
           setError(null)
+          setDetail(null)
           setOk(false)
         }}
         autoCapitalize="none"
@@ -180,6 +191,11 @@ export default function ApiKeyScreen() {
       {error ? (
         <View style={[styles.result, { backgroundColor: theme.safetyBg }]}>
           <Text style={[type.caption, { color: theme.safety, lineHeight: 19 }]}>{error}</Text>
+          {detail ? (
+            <Text style={[styles.mono, { color: theme.safety, marginTop: space.sm, fontSize: 11 }]}>
+              {detail}
+            </Text>
+          ) : null}
         </View>
       ) : null}
 
@@ -190,8 +206,9 @@ export default function ApiKeyScreen() {
             <Text style={[type.bodyStrong, { color: theme.text }]}>Key works</Text>
           </View>
           <Text style={[type.caption, { color: theme.textMuted, marginTop: space.xs, lineHeight: 19 }]}>
-            Using {model.label} at roughly ${model.approxScanCostUsd.toFixed(4)} per scan. You can
-            change the model and set a monthly cap in Profile.
+            Verified as {shape === 'bearer' ? 'an OAuth / CLI token' : 'an API key'}. Using{' '}
+            {model.label} at roughly ${model.approxScanCostUsd.toFixed(4)} per scan. You can change
+            the model and set a monthly cap in Profile.
           </Text>
         </View>
       ) : null}

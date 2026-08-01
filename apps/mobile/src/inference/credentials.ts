@@ -61,21 +61,17 @@ export function maskCredential(value: string): string {
 }
 
 /**
- * Shape check before we spend a network round trip.
+ * Is this worth spending a network round trip on?
  *
- * Deliberately loose: prefixes change, and rejecting a valid key because our
- * regex is out of date is far worse than letting the provider reject it.
+ * LENGTH ONLY, deliberately. An earlier version required an `sk-ant-` prefix for
+ * Anthropic, which meant pasting a valid `claude setup-token` credential into the
+ * API-key tab left the Verify button greyed out with no explanation — the user
+ * had a working credential and no way to submit it.
+ *
+ * Prefixes also change without notice, and the provider is the authority on
+ * whether a credential is real. Guessing here can only produce false negatives we
+ * never learn about; the probe produces a true answer either way.
  */
-export function looksPlausible(provider: ProviderId, kind: CredentialKind, value: string): boolean {
-  const v = value.trim()
-  if (v.length < 20) return false
-  if (kind === 'oauth') return true
-  switch (provider) {
-    case 'anthropic':
-      return v.startsWith('sk-ant-')
-    case 'openai':
-      return v.startsWith('sk-')
-    case 'google':
-      return v.length > 25
-  }
+export function looksPlausible(_provider: ProviderId, _kind: CredentialKind, value: string): boolean {
+  return value.trim().length >= 20
 }
