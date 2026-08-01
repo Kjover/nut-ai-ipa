@@ -177,4 +177,35 @@ maybe('the pipeline against the real USDA corpus', () => {
     // than using the FTS index.
     expect(Date.now() - started).toBeLessThan(500)
   })
+
+  /**
+   * THE HAMBURGER REGRESSION. The first real on-device scan emitted one
+   * composite "hamburger" item; the corpus has no such concept, matching
+   * degraded, and the user saw 69 g of carbs on a burger. Prompt v1.1.0 now
+   * mandates decomposition — this pins what decomposed output must do: every
+   * burger COMPONENT resolves to a real row, and the total lands where a
+   * burger lands.
+   */
+  it('resolves a decomposed hamburger component by component', async () => {
+    const r = await runPipeline(
+      payload([
+        item({ name: 'Beef patty', canonical_food_key: 'ground beef, patty, cooked', food_form: 'flat', model_gram_estimate: 90 }),
+        item({ name: 'Hamburger bun', canonical_food_key: 'bun, hamburger', food_form: 'discrete', qualitative_size: 'count:1', model_gram_estimate: 50, fallback_macros_at_estimate: { calories_kcal: 140, protein_g: 5, carbs_g: 26, fat_g: 2, fiber_g: 1, sodium_mg: 250 } }),
+        item({ name: 'Tomato slices', canonical_food_key: 'tomatoes, raw', food_form: 'discrete', qualitative_size: 'count:2', model_gram_estimate: 40, fallback_macros_at_estimate: { calories_kcal: 7, protein_g: 0.4, carbs_g: 1.6, fat_g: 0, fiber_g: 0.5, sodium_mg: 2 } }),
+        item({ name: 'Lettuce', canonical_food_key: 'lettuce, raw', food_form: 'discrete', qualitative_size: 'count:1', model_gram_estimate: 10, fallback_macros_at_estimate: { calories_kcal: 2, protein_g: 0.1, carbs_g: 0.3, fat_g: 0, fiber_g: 0.2, sodium_mg: 3 } }),
+      ]),
+      deps(),
+      foodDb,
+    )
+    expect(r).not.toBeNull()
+    for (const i of r!.items) {
+      expect(i.resolution, `${i.row.displayName} did not resolve`).not.toBe('miss')
+    }
+    // A modest burger. The regression showed 291 kcal with 69g carbs / 1g
+    // protein — protein-starved nonsense. Decomposed, protein must dominate
+    // carbs-from-vegetables and the total must be burger-shaped.
+    expect(r!.totals.kcal).toBeGreaterThan(250)
+    expect(r!.totals.kcal).toBeLessThan(700)
+    expect(r!.totals.protein_g).toBeGreaterThan(15)
+  })
 })
