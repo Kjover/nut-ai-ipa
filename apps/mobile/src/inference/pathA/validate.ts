@@ -1,4 +1,4 @@
-import type { ProviderId } from '@nutai/prompt'
+import { ANTHROPIC_OAUTH_BETA, type ProviderId } from '@nutai/prompt'
 import type { Credential, ScanFailure } from './client'
 
 /**
@@ -12,16 +12,27 @@ import type { Credential, ScanFailure } from './client'
  * Anthropic's structured-output mode wants a real schema too. Every provider
  * returned 400, which got reported as "your key was rejected". Valid keys failed.
  *
- * The fix is to stop validating with the scan request at all. Each provider has a
- * MODEL RETRIEVE endpoint that is free, non-billing, and answers both questions
- * that matter in one call: does this credential authenticate, and does this
- * account actually have this model.
+ * For OpenAI and Google the probe is the MODEL RETRIEVE endpoint: free,
+ * non-billing, and answers both questions that matter in one call — does this
+ * credential authenticate, and does this account actually have this model.
  *
- * Anthropic is the exception, because it accepts two credential shapes:
- *   - a console API key            -> `x-api-key`
- *   - a `claude setup-token` token -> `Authorization: Bearer` + an OAuth beta header
- * A setup-token can authenticate and still lack scope for /v1/models, so both
- * shapes are tried and the result reports which one worked rather than guessing.
+ * Anthropic needs more care, because it accepts two credential shapes and they
+ * probe DIFFERENT endpoints:
+ *
+ *   - console API key       -> `x-api-key` against GET /v1/models/{id} (free)
+ *   - `claude setup-token`  -> `Authorization: Bearer` + the OAuth beta header
+ *                              against a 1-token POST /v1/messages
+ *
+ * The bearer probe deliberately uses /v1/messages — the endpoint scans actually
+ * hit — because a setup-token's scopes are for inference, and whether some OTHER
+ * endpoint accepts them is exactly the kind of guess that produced the last bug.
+ * A pass here means the scan request will authenticate, full stop. Cost is one
+ * output token, drawn from the subscription for setup-tokens.
+ *
+ * Both shapes are tried in either order (wrong-tab pastes are the most common
+ * mistake), and EVERY attempt's status+body lands in `detail` — an earlier
+ * version kept only the last attempt, which hid the bearer failure behind the
+ * x-api-key fallback's 401 and made the real problem invisible in the UI.
  */
 
 export interface ValidationOk {
@@ -41,8 +52,6 @@ export interface ValidationErr {
 export type ValidationResult = ValidationOk | ValidationErr
 
 const ANTHROPIC_VERSION = '2023-06-01'
-/** Required for `claude setup-token` credentials, ignored for plain API keys. */
-const ANTHROPIC_OAUTH_BETA = 'oauth-2025-04-20'
 
 function classify(status: number, body: string): ScanFailure {
   if (status === 401 || status === 403) {
@@ -73,11 +82,17 @@ async function attempt(
   headers: Record<string, string>,
   fetchImpl: typeof fetch,
   timeoutMs: number,
+  postBody?: unknown,
 ): Promise<{ status: number; body: string } | { aborted: true } | { offline: true }> {
   const controller = new AbortController()
   const timer = setTimeout(() => controller.abort(), timeoutMs)
   try {
-    const res = await fetchImpl(url, { method: 'GET', headers, signal: controller.signal })
+    const res = await fetchImpl(url, {
+      method: postBody === undefined ? 'GET' : 'POST',
+      headers,
+      body: postBody === undefined ? undefined : JSON.stringify(postBody),
+      signal: controller.signal,
+    })
     const body = await res.text()
     return { status: res.status, body: body.slice(0, 400) }
   } catch (e) {
@@ -95,46 +110,42 @@ export async function validateCredential(
   fetchImpl: typeof fetch = fetch,
   timeoutMs = 15_000,
 ): Promise<ValidationResult> {
-  // ---- Anthropic: try both header shapes ----------------------------------
+  // ---- Anthropic: two shapes, each probing the endpoint it would really use --
   if (provider === 'anthropic') {
-    const url = `https://api.anthropic.com/v1/models/${encodeURIComponent(model)}`
+    // Each shape probes differently. x-api-key: free GET on the model-retrieve
+    // endpoint. bearer: a 1-token POST to /v1/messages, because that is the
+    // endpoint scans use and the only one a setup-token is guaranteed scoped for.
+    const probes: Record<'x-api-key' | 'bearer', () => ReturnType<typeof attempt>> = {
+      'x-api-key': () =>
+        attempt(
+          `https://api.anthropic.com/v1/models/${encodeURIComponent(model)}`,
+          { 'x-api-key': credential.value, 'anthropic-version': ANTHROPIC_VERSION },
+          fetchImpl,
+          timeoutMs,
+        ),
+      bearer: () =>
+        attempt(
+          'https://api.anthropic.com/v1/messages',
+          {
+            authorization: `Bearer ${credential.value}`,
+            'anthropic-version': ANTHROPIC_VERSION,
+            'anthropic-beta': ANTHROPIC_OAUTH_BETA,
+            'content-type': 'application/json',
+          },
+          fetchImpl,
+          timeoutMs,
+          { model, max_tokens: 1, messages: [{ role: 'user', content: 'ok' }] },
+        ),
+    }
 
-    const shapes: Array<{ shape: ValidationOk['usedShape']; headers: Record<string, string> }> =
-      credential.kind === 'oauth'
-        ? [
-            {
-              shape: 'bearer',
-              headers: {
-                authorization: `Bearer ${credential.value}`,
-                'anthropic-version': ANTHROPIC_VERSION,
-                'anthropic-beta': ANTHROPIC_OAUTH_BETA,
-              },
-            },
-            // A token pasted into the wrong tab is the single most common
-            // mistake here, so try the other shape rather than blaming the user.
-            {
-              shape: 'x-api-key',
-              headers: { 'x-api-key': credential.value, 'anthropic-version': ANTHROPIC_VERSION },
-            },
-          ]
-        : [
-            {
-              shape: 'x-api-key',
-              headers: { 'x-api-key': credential.value, 'anthropic-version': ANTHROPIC_VERSION },
-            },
-            {
-              shape: 'bearer',
-              headers: {
-                authorization: `Bearer ${credential.value}`,
-                'anthropic-version': ANTHROPIC_VERSION,
-                'anthropic-beta': ANTHROPIC_OAUTH_BETA,
-              },
-            },
-          ]
+    // A credential pasted into the wrong tab is the single most common mistake
+    // here, so the other shape is always tried before blaming the user.
+    const order: Array<'x-api-key' | 'bearer'> =
+      credential.kind === 'oauth' ? ['bearer', 'x-api-key'] : ['x-api-key', 'bearer']
 
-    let last = ''
-    for (const { shape, headers } of shapes) {
-      const r = await attempt(url, headers, fetchImpl, timeoutMs)
+    const details: string[] = []
+    for (const shape of order) {
+      const r = await probes[shape]()
       if ('offline' in r) {
         return {
           ok: false,
@@ -150,14 +161,14 @@ export async function validateCredential(
         }
       }
       if (r.status >= 200 && r.status < 300) return { ok: true, usedShape: shape, modelId: model }
-      last = `${shape}: HTTP ${r.status} — ${r.body}`
+      details.push(`${shape}: HTTP ${r.status} — ${r.body}`)
       // A 404 means auth worked but the model is wrong; trying the other header
       // shape cannot help, so stop and say so.
       if (r.status === 404) {
-        return { ok: false, error: classify(404, r.body), detail: last }
+        return { ok: false, error: classify(404, r.body), detail: details.join('\n') }
       }
     }
-    return { ok: false, error: classify(401, last), detail: last }
+    return { ok: false, error: classify(401, details.join('\n')), detail: details.join('\n') }
   }
 
   // ---- OpenAI --------------------------------------------------------------

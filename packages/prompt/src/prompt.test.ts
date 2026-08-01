@@ -66,8 +66,11 @@ describe('provider wire formats', () => {
     const o = buildAnthropicRequest(base, { kind: 'oauth', value: 'tok' })
     expect(k.headers['x-api-key']).toBe('sk-ant-x')
     expect(k.headers['authorization']).toBeUndefined()
+    expect(k.headers['anthropic-beta']).toBeUndefined()
     expect(o.headers['authorization']).toBe('Bearer tok')
     expect(o.headers['x-api-key']).toBeUndefined()
+    // A setup-token 401s on /v1/messages without this, even when valid.
+    expect(o.headers['anthropic-beta']).toBe('oauth-2025-04-20')
   })
 
   it('puts the system prompt in the system field for every provider', () => {

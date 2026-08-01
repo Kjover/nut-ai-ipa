@@ -110,14 +110,21 @@ const USER_INSTRUCTION =
 /**
  * Anthropic. Two credential shapes exist and they are NOT interchangeable:
  * a normal API key uses `x-api-key`, while a `claude setup-token` credential is a
- * bearer token. A setup token may authenticate and still lack scope for
- * /v1/messages, so the validation probe exercises both and reports which worked.
+ * bearer token that additionally REQUIRES the `anthropic-beta` OAuth header —
+ * without it the messages endpoint 401s even for a perfectly valid token.
  */
+export const ANTHROPIC_OAUTH_BETA = 'oauth-2025-04-20'
+
 export function buildAnthropicRequest(input: BuildRequestInput, credential: { kind: 'api_key' | 'oauth'; value: string }): ProviderRequest {
   const headers: Record<string, string> =
     credential.kind === 'api_key'
       ? { 'x-api-key': credential.value, 'anthropic-version': '2023-06-01', 'content-type': 'application/json' }
-      : { authorization: `Bearer ${credential.value}`, 'anthropic-version': '2023-06-01', 'content-type': 'application/json' }
+      : {
+          authorization: `Bearer ${credential.value}`,
+          'anthropic-version': '2023-06-01',
+          'anthropic-beta': ANTHROPIC_OAUTH_BETA,
+          'content-type': 'application/json',
+        }
 
   const content: unknown[] = input.imagesBase64.map((data) => ({
     type: 'image',
