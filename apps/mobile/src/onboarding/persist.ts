@@ -1,0 +1,113 @@
+import Storage from 'expo-sqlite/kv-store'
+import { migrate } from '@nutai/db-adapter'
+import type { CalorieTarget, MacroTargets } from '@nutai/goals'
+import { openUserDb } from '../db/expo-adapter'
+import { ONBOARDING_DONE_KEY } from '../../app/_layout'
+import {
+  activityFor,
+  ageFrom,
+  featureDefaultsFor,
+  todayEmphasisFor,
+  type OnboardingAnswers,
+} from './store'
+
+/**
+ * Write the onboarding result into `user.db`.
+ *
+ * The `goals` table is APPEND-ONLY. A goal change is a new row, never an UPDATE,
+ * so a historical day can always be read against the target that was actually in
+ * force that day. Recomputing March against August's target would silently
+ * rewrite whether someone hit their goal three months ago.
+ *
+ * `target_raw_kcal` and `floor_applied` are stored alongside the final target,
+ * because "1,200 because we clamped it" and "1,200 because that is your maths"
+ * are different facts and the Settings screen has to be able to tell them apart.
+ */
+export async function persistOnboarding(
+  answers: OnboardingAnswers,
+  target: CalorieTarget,
+  macros: MacroTargets,
+): Promise<void> {
+  const db = await openUserDb()
+  const now = Date.now()
+
+  await migrate(db, now)
+
+  const features = featureDefaultsFor(answers.blocker)
+
+  await db.transaction(async (tx) => {
+    await tx.run(
+      `INSERT OR REPLACE INTO user_profile
+         (id, sex, birth_year, height_cm, activity_level, units, weight_visible,
+          gamification, inference_path, created_at)
+       VALUES (1, ?, ?, ?, ?, ?, 1, ?, 'none', ?)`,
+      [
+        answers.sex,
+        answers.birthYear,
+        answers.heightCm,
+        activityFor(answers.workoutsPerWeek),
+        answers.units,
+        features.streakOn ? 1 : 0,
+        now,
+      ],
+    )
+
+    await tx.run(
+      `INSERT INTO goals
+         (effective_from, goal_type, rate_lb_per_week, target_kcal, target_raw_kcal,
+          floor_applied, protein_g, fat_g, carbs_g, bmr, tdee, adaptive)
+       VALUES (?,?,?,?,?,?,?,?,?,?,?,1)`,
+      [
+        now,
+        answers.goal ?? 'maintain',
+        null,
+        target.target,
+        target.targetRaw,
+        target.floorApplied ? 1 : 0,
+        macros.protein_g,
+        macros.fat_g,
+        macros.carbs_g,
+        target.bmr,
+        target.tdee,
+      ],
+    )
+
+    if (answers.weightKg != null) {
+      const localDate = new Date(now).toISOString().slice(0, 10)
+      await tx.run(
+        'INSERT OR REPLACE INTO weight_entries (local_date, weight_kg, logged_at) VALUES (?,?,?)',
+        [localDate, answers.weightKg, now],
+      )
+    }
+
+    // Every setting below has a consumer. See the note at the top of store.ts:
+    // a field written here with nothing reading it means the screen that asked
+    // for it should be deleted, not the row.
+    const settings: Array<[string, string]> = [
+      ['diet.style', answers.dietStyle ?? 'balanced'],
+      ['goal.desiredWeightKg', String(answers.desiredWeightKg ?? answers.weightKg ?? '')],
+      ['goal.blocker', answers.blocker ?? ''],
+      ['goal.accomplish', answers.accomplish ?? ''],
+      ['today.emphasis', todayEmphasisFor(answers.accomplish)],
+      ['calories.rollover', answers.rolloverCalories ? 'true' : 'false'],
+      ['calories.rolloverCapKcal', '200'],
+      ['professional.working', answers.worksWithProfessional ? 'true' : 'false'],
+      ['export.shareablePdf', answers.worksWithProfessional ? 'true' : 'false'],
+      ['coaching.suppressNudges', answers.worksWithProfessional ? 'true' : 'false'],
+      ['reminders.enabled', features.remindersOn ? 'true' : 'false'],
+      ['streak.enabled', features.streakOn ? 'true' : 'false'],
+      ['foods.savedPinned', features.savedMealsPinned ? 'true' : 'false'],
+      ['healthScore.visible', features.showHealthScore ? 'true' : 'false'],
+      ['mealIdeas.visible', features.showMealIdeas ? 'true' : 'false'],
+      ['health.intent', answers.healthConnected ? 'true' : 'false'],
+      ['age.years', String(ageFrom(answers, now))],
+    ]
+
+    for (const [key, value] of settings) {
+      await tx.run('INSERT OR REPLACE INTO settings (key, value) VALUES (?,?)', [key, value])
+    }
+  })
+
+  await db.close()
+  await Storage.setItem(ONBOARDING_DONE_KEY, 'true')
+}
