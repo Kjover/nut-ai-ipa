@@ -24,6 +24,11 @@ export const FLOW = [
   'diet',
   'accomplish',
   'rollover',
+  // Path A setup. Placed after the plan-shaping questions and before first
+  // camera use, so the named destination is consented to before any photo could
+  // leave the device.
+  'provider',
+  'apikey',
   'health',
   'thanks',
   'notifications',

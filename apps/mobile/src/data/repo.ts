@@ -9,6 +9,9 @@ import {
   type MacroTargets,
   type WeightPoint,
 } from '@nutai/goals'
+import Storage from 'expo-sqlite/kv-store'
+import { ONBOARDING_DONE_KEY } from '../../app/_layout'
+import { clearCredential } from '../inference/credentials'
 import { openUserDb } from '../db/expo-adapter'
 
 /**
@@ -38,6 +41,41 @@ export function localDate(ms: number): string {
   const m = String(d.getMonth() + 1).padStart(2, '0')
   const day = String(d.getDate()).padStart(2, '0')
   return `${y}-${m}-${day}`
+}
+
+/**
+ * Wipe every local trace and send the app back to the first onboarding screen.
+ *
+ * Deletes user data, drops the stored API credentials out of the Keychain, and
+ * clears the completion flag. The bundled nutrition corpus is left alone — it is
+ * a read-only build artifact, not user data, and re-importing 4.7 MB to prove a
+ * point would just make this slow.
+ */
+export async function resetEverything(): Promise<void> {
+  const h = await db()
+  const tables = [
+    'log_items', 'meals', 'weight_entries', 'water_entries', 'exercise_entries',
+    'day_summaries', 'goals', 'user_profile', 'settings', 'personal_gram_priors',
+    'food_attribute_memory', 'user_containers', 'saved_meals', 'scan_cost_ledger',
+    'scan_cache', 'consents', 'accuracy_baselines', 'user_foods',
+  ]
+  await h.transaction(async (tx) => {
+    for (const t of tables) {
+      // A missing table is not an error here — an interrupted migration should
+      // still be resettable, which is exactly when someone reaches for this.
+      try {
+        await tx.run(`DELETE FROM ${t}`)
+      } catch {
+        /* table absent */
+      }
+    }
+  })
+
+  for (const p of ['anthropic', 'openai', 'google'] as const) {
+    await clearCredential(p)
+  }
+
+  await Storage.removeItem(ONBOARDING_DONE_KEY)
 }
 
 // ---------------------------------------------------------------------------

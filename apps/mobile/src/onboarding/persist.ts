@@ -41,7 +41,7 @@ export async function persistOnboarding(
       `INSERT OR REPLACE INTO user_profile
          (id, sex, birth_year, height_cm, activity_level, units, weight_visible,
           gamification, inference_path, created_at)
-       VALUES (1, ?, ?, ?, ?, ?, 1, ?, 'none', ?)`,
+       VALUES (1, ?, ?, ?, ?, ?, 1, ?, ?, ?)`,
       [
         answers.sex,
         answers.birthYear,
@@ -49,6 +49,7 @@ export async function persistOnboarding(
         activityFor(answers.workoutsPerWeek),
         answers.units,
         features.streakOn ? 1 : 0,
+        answers.provider && answers.provider !== 'none' ? 'cloud' : 'none',
         now,
       ],
     )
@@ -101,6 +102,8 @@ export async function persistOnboarding(
       ['healthScore.visible', features.showHealthScore ? 'true' : 'false'],
       ['mealIdeas.visible', features.showMealIdeas ? 'true' : 'false'],
       ['health.intent', answers.healthConnected ? 'true' : 'false'],
+      ['inference.provider', answers.provider ?? 'none'],
+      ['inference.model', answers.providerModel ?? ''],
       ['age.years', String(ageFrom(answers, now))],
     ]
 

@@ -1,5 +1,6 @@
 import { useSyncExternalStore } from 'react'
 import type { ActivityLevel, Goal, Sex } from '@nutai/goals'
+import type { ProviderId } from '@nutai/prompt'
 
 /**
  * Onboarding answers.
@@ -68,6 +69,9 @@ export interface OnboardingAnswers {
   accomplish: Accomplish | null
   rolloverCalories: boolean | null
   healthConnected: boolean
+  /** 'none' means no cloud key — barcode, label OCR, search and manual still work. */
+  provider: ProviderId | 'none' | undefined
+  providerModel: string | null
 }
 
 const EMPTY: OnboardingAnswers = {
@@ -87,6 +91,8 @@ const EMPTY: OnboardingAnswers = {
   accomplish: null,
   rolloverCalories: null,
   healthConnected: false,
+  provider: undefined,
+  providerModel: null,
 }
 
 let answers: OnboardingAnswers = { ...EMPTY }

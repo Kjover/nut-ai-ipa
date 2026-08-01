@@ -1,9 +1,10 @@
 import { router, useFocusEffect } from 'expo-router'
 import { useCallback, useState } from 'react'
+import { Alert } from 'react-native'
 import { Pressable, ScrollView, StyleSheet, Text, View } from 'react-native'
 import { useSafeAreaInsets } from 'react-native-safe-area-context'
 import { availability } from '../../src/health/healthkit'
-import { currentGoal, setting, type CurrentGoal } from '../../src/data/repo'
+import { currentGoal, resetEverything, setting, type CurrentGoal } from '../../src/data/repo'
 import { Icon } from '../../src/components/Icon'
 import { useTheme } from '../../src/theme/ThemeProvider'
 import { radius, space, type } from '../../src/theme/tokens'
@@ -104,6 +105,29 @@ export default function Profile() {
             ) : null}
           </View>
         ) : null}
+      </Section>
+
+      <Section title="Start over">
+        <Row
+          label="Redo onboarding"
+          value=""
+          onPress={() => {
+            Alert.alert(
+              'Erase everything and start over?',
+              'Deletes your profile, goals, weight history, logged meals and saved API keys from this device. It cannot be undone, and there is no backup on a server because there is no server.',
+              [
+                { text: 'Cancel', style: 'cancel' },
+                {
+                  text: 'Erase and restart',
+                  style: 'destructive',
+                  onPress: () => {
+                    void resetEverything().then(() => router.replace('/onboarding' as never))
+                  },
+                },
+              ],
+            )
+          }}
+        />
       </Section>
 
       <Section title="About">
