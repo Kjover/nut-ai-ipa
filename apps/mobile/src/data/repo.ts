@@ -12,8 +12,11 @@ import {
 import Storage from 'expo-sqlite/kv-store'
 import { ONBOARDING_DONE_KEY } from '../onboarding/done-key'
 import { EXPORT_TABLES, WIPE_ONLY_TABLES } from './backup-core'
+import { localDate, slotFor } from './date-utils'
 import { clearCredential } from '../inference/credentials'
 import { openUserDb } from '../db/expo-adapter'
+
+export { localDate, slotFor }
 
 /**
  * The read/write layer over `user.db`.
@@ -34,15 +37,6 @@ export async function db(): Promise<DbAdapter> {
   return handle
 }
 
-export function localDate(ms: number): string {
-  // Local, not UTC. An 11pm meal must not migrate to tomorrow, and a user who
-  // flies must not have yesterday's log rewritten under them.
-  const d = new Date(ms)
-  const y = d.getFullYear()
-  const m = String(d.getMonth() + 1).padStart(2, '0')
-  const day = String(d.getDate()).padStart(2, '0')
-  return `${y}-${m}-${day}`
-}
 
 /**
  * Wipe every local trace and send the app back to the first onboarding screen.
@@ -243,15 +237,6 @@ export async function dayTotals(date: string): Promise<DayTotals> {
 // ---------------------------------------------------------------------------
 // Meals
 // ---------------------------------------------------------------------------
-
-/** Local hour → slot. Deterministic, editable later; never inferred by a model. */
-function slotFor(ms: number): string {
-  const h = new Date(ms).getHours()
-  if (h < 11) return 'breakfast'
-  if (h < 16) return 'lunch'
-  if (h < 21) return 'dinner'
-  return 'snack'
-}
 
 /**
  * Persist a reviewed scan. One transaction: the meal row, every ingredient with
