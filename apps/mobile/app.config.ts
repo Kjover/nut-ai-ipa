@@ -12,6 +12,21 @@ const SLUG = 'nut-ai'
 const BUNDLE_ID = 'com.nutai.app'
 const SCHEME = 'nutai'
 
+/**
+ * Apple will not issue a HealthKit-capable provisioning profile to a free
+ * personal-team Apple ID — full stop, no signing setting routes around it.
+ * ("Trying to Sign the app but it doesn't work" reproduced: with a free team
+ * selected and Automatic signing on, the real Xcode error is "Provisioning
+ * profile ... doesn't include the HealthKit capability / entitlement" — a
+ * platform restriction, not a bug in this project's signing config.) HealthKit
+ * is additive (README: "Health reconnect"), and src/health/healthkit.ts is
+ * already written to degrade gracefully when it is unavailable, so a free-team
+ * builder can opt out of the entitlement entirely and get everything else:
+ *
+ *   SKIP_HEALTHKIT=1 npm run prebuild
+ */
+const SKIP_HEALTHKIT = process.env.SKIP_HEALTHKIT === '1'
+
 const config: ExpoConfig = {
   name: NAME,
   slug: SLUG,
@@ -59,21 +74,28 @@ const config: ExpoConfig = {
     ['expo-camera', { cameraPermission: 'Nut AI uses your camera to photograph meals and scan barcodes.' }],
     'expo-secure-store',
     'expo-sqlite',
-    [
-      '@kingstinct/react-native-healthkit',
-      {
-        // Both strings are required by App Review, and they must describe what we
-        // actually do rather than what HealthKit could theoretically allow.
-        NSHealthShareUsageDescription:
-          'Nut AI reads your steps, workouts and weight so your calorie target reflects what you actually did, instead of a fixed guess.',
-        NSHealthUpdateUsageDescription:
-          'Nut AI writes the meals you log to Health so your nutrition data lives alongside the rest of your health record.',
-        // Background delivery is deliberately off. It is an extra entitlement, it
-        // is a battery cost, and nothing here needs to react to a step count
-        // while the app is closed.
-        background: false,
-      },
-    ],
+    ...(SKIP_HEALTHKIT
+      ? []
+      : ([
+          [
+            '@kingstinct/react-native-healthkit',
+            {
+              // Both strings are required by App Review, and they must describe what we
+              // actually do rather than what HealthKit could theoretically allow.
+              NSHealthShareUsageDescription:
+                'Nut AI reads your steps, workouts and weight so your calorie target reflects what you actually did, instead of a fixed guess.',
+              NSHealthUpdateUsageDescription:
+                'Nut AI writes the meals you log to Health so your nutrition data lives alongside the rest of your health record.',
+              // Background delivery is deliberately off. It is an extra entitlement, it
+              // is a battery cost, and nothing here needs to react to a step count
+              // while the app is closed.
+              background: false,
+            },
+          ],
+        ] as [string, Record<string, unknown>][])),
+    // Every builder signs with their own free Apple ID — see the plugin doc
+    // comment for why this can only ever set the MODE (automatic), never a team.
+    './plugins/withAutomaticSigning',
   ],
 
   experiments: { typedRoutes: true },

@@ -23,13 +23,32 @@ import { createInterface } from 'node:readline'
 import { dirname, join } from 'node:path'
 import { fileURLToPath } from 'node:url'
 import Database from 'better-sqlite3'
+import { SOURCES, FDC_DIR, findExtracted, ensureSource } from './fetch.mjs'
 
 const HERE = dirname(fileURLToPath(import.meta.url))
 const REPO = join(HERE, '../../..')
 
-/** Where the unpacked USDA CSV directories live. Override with FDC_DIR. */
-const FDC_DIR = process.env.FDC_DIR ?? '/tmp/fdc'
 const OUT = process.env.OUT ?? join(REPO, 'apps/mobile/assets/nutrition.db')
+
+/**
+ * Resolves a source to its extracted directory, tolerating drift in the
+ * dated folder name USDA bakes into each release (they re-cut Foundation
+ * Foods ~2x/yr; the folder name always changes with it). Downloads and
+ * extracts automatically via fetch.mjs if nothing usable is found yet.
+ */
+async function resolveSourceDir(source) {
+  const found = await findExtracted(FDC_DIR, source.prefix)
+  if (found.usable) {
+    if (found.dirs.length > 1) {
+      console.log(
+        `  ${source.label}: multiple candidates under ${FDC_DIR} (${found.dirs.join(', ')}); using ${found.usableName}`,
+      )
+    }
+    return found.usable
+  }
+  console.log(`  ${source.label}: not found under ${FDC_DIR} yet — fetching`)
+  return ensureSource(source)
+}
 
 /**
  * Expected headers, verified against the real 2025-04-24 Foundation Foods and
@@ -203,19 +222,28 @@ async function main() {
 
   const state = { foods: new Map(), portions: [] }
 
-  const sources = [
-    { dir: join(FDC_DIR, 'FoodData_Central_foundation_food_csv_2025-04-24'), label: 'FDC Foundation Foods 2025-04-24' },
-    { dir: join(FDC_DIR, 'FoodData_Central_sr_legacy_food_csv_2018-04'), label: 'FDC SR Legacy 2018-04' },
-  ]
-
-  for (const s of sources) {
-    console.log(`Ingesting ${s.label}`)
-    await ingest(s.dir, s.label, state)
+  const resolved = []
+  for (const source of SOURCES) {
+    const dir = await resolveSourceDir(source)
+    const label = `${source.label} (${dir.split('/').pop()})`
+    resolved.push({ label })
+    console.log(`Ingesting ${label}`)
+    await ingest(dir, label, state)
   }
 
   await mkdir(dirname(OUT), { recursive: true })
   const db = new Database(OUT)
   db.pragma('journal_mode = DELETE')
+  // This build recreates the artifact from scratch on every run, including
+  // re-runs against a nutrition.db a previous run already populated (a user
+  // retrying `npm run data:build` after fixing an earlier failure is exactly
+  // that case). food_portions.food_id REFERENCES foods(id), and this
+  // better-sqlite3 build defaults `foreign_keys` ON — so on a second run
+  // `DROP TABLE foods` failed with "FOREIGN KEY constraint failed" because
+  // food_portions (which still held rows referencing it) hadn't been dropped
+  // yet. FK enforcement only matters for the app's live writes, not this
+  // one-shot rebuild, so it is turned off for the DROP + rebuild.
+  db.pragma('foreign_keys = OFF')
   db.exec('DROP TABLE IF EXISTS foods; DROP TABLE IF EXISTS food_portions; DROP TABLE IF EXISTS food_fts; DROP TABLE IF EXISTS food_fts_trigram; DROP TABLE IF EXISTS build_manifest; DROP TABLE IF EXISTS brands; DROP TABLE IF EXISTS food_micros; DROP TABLE IF EXISTS food_synonyms;')
 
   // Schema is imported from the app's own package so the artifact can never
@@ -294,7 +322,7 @@ async function main() {
   }
   db.transaction(() => {
     manifest.run('tier', 'generic')
-    manifest.run('sources', sources.map((s) => s.label).join(' | '))
+    manifest.run('sources', resolved.map((s) => s.label).join(' | '))
     manifest.run('licenses', 'CC0-1.0 (USDA FoodData Central)')
     manifest.run('attribution', 'U.S. Department of Agriculture, Agricultural Research Service. FoodData Central.')
     manifest.run('food_count', String(counts.foods))

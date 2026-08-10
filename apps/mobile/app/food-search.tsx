@@ -5,8 +5,26 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context'
 import type { DbAdapter } from '@nutai/db-adapter'
 import { resolveByText, type ScoredCandidate } from '@nutai/resolver'
 import { nutritionCorpusInfo, openNutritionDb } from '../src/db/expo-adapter'
+import { db } from '../src/data/repo'
+import { resolveSelection } from '../src/data/food-search-select'
+import { logManualFood } from '../src/data/manual-food'
 import { useTheme } from '../src/theme/ThemeProvider'
-import { radius, space, type } from '../src/theme/tokens'
+import { MIN_TAP_TARGET, radius, space, type } from '../src/theme/tokens'
+
+/**
+ * What a tap on a candidate row does, end to end: resolve its grams + snapshot
+ * from the (read-only) nutrition corpus (`resolveSelection`), then log it to
+ * today in the user db (`logManualFood`). Both of those are pure, DB-only
+ * functions with their own regression coverage in food-search-select.test.ts;
+ * this function additionally reaches for the live app db singleton via
+ * `db()`, so — like every other screen in this app — it is only exercised by
+ * the running app, not by that test.
+ */
+async function selectFood(nutritionDb: DbAdapter, candidate: ScoredCandidate, now: number): Promise<number> {
+  const selection = await resolveSelection(nutritionDb, candidate)
+  const userDb = await db()
+  return logManualFood(userDb, selection, now)
+}
 
 /**
  * Foods — the library that replaces the incumbent's `Groups` social feed.
@@ -27,6 +45,8 @@ export default function FoodSearch() {
   const [results, setResults] = useState<ScoredCandidate[]>([])
   const [outcome, setOutcome] = useState<string>('')
   const [busy, setBusy] = useState(false)
+  const [selectingId, setSelectingId] = useState<string | null>(null)
+  const [error, setError] = useState<string | null>(null)
 
   useEffect(() => {
     let alive = true
@@ -67,6 +87,19 @@ export default function FoodSearch() {
     }, 180)
     return () => { alive = false; clearTimeout(timer) }
   }, [db, query])
+
+  async function handleSelect(candidate: ScoredCandidate) {
+    if (!db || selectingId != null) return
+    setSelectingId(candidate.foodId)
+    setError(null)
+    try {
+      await selectFood(db, candidate, Date.now())
+      router.back()
+    } catch {
+      setError('Could not log that food — try again.')
+      setSelectingId(null)
+    }
+  }
 
   const corpusLine = useMemo(() => {
     if (!corpus) return 'Loading corpus…'
@@ -109,8 +142,23 @@ export default function FoodSearch() {
         <Text style={[type.micro, { color: theme.textFaint, marginTop: space.md }]}>{outcome.toUpperCase()}</Text>
       )}
 
+      {error != null && (
+        <Text style={[type.caption, { color: theme.safety, marginTop: space.md }]}>{error}</Text>
+      )}
+
       {results.map((r) => (
-        <View key={r.foodId} style={[styles.row, { borderColor: theme.border }]}>
+        <Pressable
+          key={r.foodId}
+          testID={`food-search-row-${r.foodId}`}
+          accessibilityRole="button"
+          accessibilityLabel={`Log ${r.name}`}
+          disabled={selectingId != null}
+          onPress={() => handleSelect(r)}
+          style={({ pressed }) => [
+            styles.row,
+            { borderColor: theme.border, minHeight: MIN_TAP_TARGET, opacity: pressed ? 0.6 : 1 },
+          ]}
+        >
           <View style={{ flex: 1 }}>
             <Text style={[type.body, { color: theme.text }]} numberOfLines={2}>{r.name}</Text>
             <Text style={[type.caption, { color: theme.textMuted, marginTop: 2 }]}>
@@ -118,8 +166,12 @@ export default function FoodSearch() {
               {r.brand ? ` · ${r.brand}` : ''}
             </Text>
           </View>
-          <Text style={[type.micro, { color: theme.textFaint }]}>{r.score.toFixed(2)}</Text>
-        </View>
+          {selectingId === r.foodId ? (
+            <ActivityIndicator color={theme.textFaint} />
+          ) : (
+            <Text style={[type.micro, { color: theme.textFaint }]}>{r.score.toFixed(2)}</Text>
+          )}
+        </Pressable>
       ))}
 
       {query.trim().length >= 2 && !busy && results.length === 0 && (
